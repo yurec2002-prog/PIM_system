@@ -565,7 +565,7 @@ export function SupplierCategoryTree() {
   const stats = treeMode === 'supplier' ? countCategories(categories) : { ...countInternalCategories(internalCategories), mapped: 0 };
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="w-full">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2 mb-2">
           <FolderTree className="w-7 h-7" />
@@ -671,7 +671,7 @@ export function SupplierCategoryTree() {
                   No categories found for this supplier
                 </div>
               ) : (
-                <div className="border border-gray-200 rounded-md max-h-[600px] overflow-y-auto">
+                <div className="border border-gray-200 rounded-md">
                   {categories.map(cat => renderCategory(cat))}
                 </div>
               )
@@ -681,7 +681,7 @@ export function SupplierCategoryTree() {
                   No internal categories found
                 </div>
               ) : (
-                <div className="border border-gray-200 rounded-md max-h-[600px] overflow-y-auto">
+                <div className="border border-gray-200 rounded-md">
                   {internalCategories.map(cat => renderInternalCategory(cat))}
                 </div>
               )
