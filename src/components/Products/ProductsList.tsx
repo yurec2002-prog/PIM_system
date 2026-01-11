@@ -31,6 +31,10 @@ interface Product {
   completeness_score: number;
   supplier_category_id: string | null;
   internal_category_id: string | null;
+  blocking_reasons?: string[];
+  blocking_reasons_text?: { ru: string[]; uk: string[] };
+  warnings?: string[];
+  warnings_text?: { ru: string[]; uk: string[] };
   created_at: string;
   updated_at: string;
 }
@@ -188,23 +192,12 @@ export function ProductsList({ onSelectProduct }: ProductsListProps) {
     }
   };
 
-  const getReadinessReasons = (product: EnrichedProduct): string[] => {
-    const reasons: string[] = [];
+  const getBlockingReasons = (product: EnrichedProduct): string[] => {
+    return product.blocking_reasons_text?.ru || [];
+  };
 
-    if (!product.name_ru && !product.name_uk) {
-      reasons.push('Нет названия');
-    }
-    if (!product.internal_category_id) {
-      reasons.push('Нет категории');
-    }
-    if (getRetailPrice(product) === 0) {
-      reasons.push('Нет цены');
-    }
-    if (!product.images || product.images.length === 0) {
-      reasons.push('Нет изображений');
-    }
-
-    return reasons;
+  const getWarnings = (product: EnrichedProduct): string[] => {
+    return product.warnings_text?.ru || [];
   };
 
   const isRecentlyUpdated = (product: EnrichedProduct): boolean => {
@@ -466,7 +459,8 @@ export function ProductsList({ onSelectProduct }: ProductsListProps) {
                   const retailPrice = getRetailPrice(product);
                   const purchasePrice = getPurchasePrice(product);
                   const margin = getMargin(product);
-                  const readinessReasons = getReadinessReasons(product);
+                  const blockingReasons = getBlockingReasons(product);
+                  const warnings = getWarnings(product);
                   const hasImages = product.images && product.images.length > 0;
                   const recentlyUpdated = isRecentlyUpdated(product);
 
@@ -582,23 +576,46 @@ export function ProductsList({ onSelectProduct }: ProductsListProps) {
                       <td className="px-4 py-3 text-center">
                         <div className="relative group inline-block">
                           {product.is_ready ? (
-                            <div className="inline-flex items-center space-x-1 px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                              <CheckCircle className="w-3 h-3" />
-                              <span>Готов</span>
-                            </div>
+                            <>
+                              <div className="inline-flex items-center space-x-1 px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                                <CheckCircle className="w-3 h-3" />
+                                <span>Готов</span>
+                              </div>
+                              {warnings.length > 0 && (
+                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-20">
+                                  <div className="bg-gray-900 text-white text-xs rounded-lg py-2 px-3 whitespace-nowrap">
+                                    <div className="font-medium mb-1 text-yellow-300">⚠ Предупреждения:</div>
+                                    {warnings.map((warning, i) => (
+                                      <div key={i} className="text-gray-200">• {warning}</div>
+                                    ))}
+                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                                      <div className="border-4 border-transparent border-t-gray-900"></div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </>
                           ) : (
                             <>
                               <div className="inline-flex items-center space-x-1 px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
                                 <XCircle className="w-3 h-3" />
                                 <span>Не готов</span>
                               </div>
-                              {readinessReasons.length > 0 && (
+                              {blockingReasons.length > 0 && (
                                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-20">
                                   <div className="bg-gray-900 text-white text-xs rounded-lg py-2 px-3 whitespace-nowrap">
-                                    <div className="font-medium mb-1">Недостающее:</div>
-                                    {readinessReasons.map((reason, i) => (
-                                      <div key={i}>• {reason}</div>
+                                    <div className="font-medium mb-1 text-red-300">🚫 Блокирующие причины:</div>
+                                    {blockingReasons.map((reason, i) => (
+                                      <div key={i} className="text-gray-200">• {reason}</div>
                                     ))}
+                                    {warnings.length > 0 && (
+                                      <>
+                                        <div className="font-medium mt-2 mb-1 text-yellow-300">⚠ Предупреждения:</div>
+                                        {warnings.map((warning, i) => (
+                                          <div key={i} className="text-gray-200">• {warning}</div>
+                                        ))}
+                                      </>
+                                    )}
                                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
                                       <div className="border-4 border-transparent border-t-gray-900"></div>
                                     </div>
@@ -620,8 +637,13 @@ export function ProductsList({ onSelectProduct }: ProductsListProps) {
                           >
                             <ImageIcon className="w-4 h-4" />
                           </div>
-                          {readinessReasons.length > 0 && (
-                            <div className="p-1 rounded text-yellow-500" title="Требует внимания">
+                          {blockingReasons.length > 0 && (
+                            <div className="p-1 rounded text-red-500" title="Есть блокирующие причины">
+                              <XCircle className="w-4 h-4" />
+                            </div>
+                          )}
+                          {warnings.length > 0 && (
+                            <div className="p-1 rounded text-yellow-500" title="Есть предупреждения">
                               <AlertCircle className="w-4 h-4" />
                             </div>
                           )}

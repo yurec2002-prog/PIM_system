@@ -36,6 +36,10 @@ interface Product {
   completeness_score: number;
   supplier_category_id: string | null;
   internal_category_id: string | null;
+  blocking_reasons?: string[];
+  blocking_reasons_text?: { ru: string[]; uk: string[] };
+  warnings?: string[];
+  warnings_text?: { ru: string[]; uk: string[] };
   created_at: string;
   updated_at: string;
 }
@@ -139,47 +143,14 @@ export function ProductDetails({ productId, onClose }: ProductDetailsProps) {
     return path.join(' / ');
   };
 
-  const getReadinessReasons = (): Array<{ label: string; passed: boolean; critical: boolean }> => {
-    const retailPrice = findPrice('retail');
-    const purchasePrice = findPrice('purchase');
+  const getBlockingReasons = (): string[] => {
+    const lang = language === 'uk' ? 'uk' : 'ru';
+    return product?.blocking_reasons_text?.[lang] || [];
+  };
 
-    return [
-      {
-        label: 'Название товара',
-        passed: !!(product?.name_uk || product?.name_ru),
-        critical: true,
-      },
-      {
-        label: 'Внутренняя категория',
-        passed: !!internalCategory,
-        critical: true,
-      },
-      {
-        label: 'Розничная цена',
-        passed: retailPrice > 0,
-        critical: true,
-      },
-      {
-        label: 'Закупочная цена',
-        passed: purchasePrice > 0,
-        critical: false,
-      },
-      {
-        label: 'Изображения',
-        passed: !!(product?.images && product.images.length > 0),
-        critical: false,
-      },
-      {
-        label: 'Штрихкод',
-        passed: !!product?.barcode,
-        critical: false,
-      },
-      {
-        label: 'Наличие на складе',
-        passed: (product?.total_stock || 0) > 0,
-        critical: false,
-      },
-    ];
+  const getWarnings = (): string[] => {
+    const lang = language === 'uk' ? 'uk' : 'ru';
+    return product?.warnings_text?.[lang] || [];
   };
 
   const findPrice = (priceTypePattern: string): number => {
@@ -285,9 +256,9 @@ export function ProductDetails({ productId, onClose }: ProductDetailsProps) {
   const marginPercent = retailPrice > 0 ? (margin / retailPrice) * 100 : 0;
   const markup = purchasePrice > 0 ? ((retailPrice / purchasePrice - 1) * 100) : 0;
 
-  const readinessReasons = getReadinessReasons();
-  const failedCritical = readinessReasons.filter(r => r.critical && !r.passed);
-  const isReady = failedCritical.length === 0;
+  const blockingReasons = getBlockingReasons();
+  const warnings = getWarnings();
+  const isReady = product?.is_ready || false;
 
   const productName = language === 'uk' ? (product?.name_uk || product?.name_ru) : (product?.name_ru || product?.name_uk);
 
@@ -416,41 +387,76 @@ export function ProductDetails({ productId, onClose }: ProductDetailsProps) {
                   )}
                 </div>
 
-                <div className="flex items-center space-x-4 mt-2">
-                  <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    isReady ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
-                    {isReady ? (
-                      <>
-                        <CheckCircle2 className="w-4 h-4 mr-1" />
-                        Готов к продаже
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="w-4 h-4 mr-1" />
-                        Не готов
-                        {failedCritical.length > 0 && (
-                          <span className="ml-1">({failedCritical.map(r => r.label).join(', ')})</span>
-                        )}
-                      </>
-                    )}
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center space-x-3">
+                    <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                      isReady ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {isReady ? (
+                        <>
+                          <CheckCircle2 className="w-4 h-4 mr-1" />
+                          Готов к продаже
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="w-4 h-4 mr-1" />
+                          Не готов к продаже
+                        </>
+                      )}
+                    </div>
+
+                    <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                      product.total_stock > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {product.total_stock > 0 ? (
+                        <>
+                          <Package className="w-4 h-4 mr-1" />
+                          В наличии: {product.total_stock} шт
+                        </>
+                      ) : (
+                        <>
+                          <Package className="w-4 h-4 mr-1" />
+                          Нет в наличии
+                        </>
+                      )}
+                    </div>
                   </div>
 
-                  <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    product.total_stock > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {product.total_stock > 0 ? (
-                      <>
-                        <Package className="w-4 h-4 mr-1" />
-                        В наличии: {product.total_stock} шт
-                      </>
-                    ) : (
-                      <>
-                        <Package className="w-4 h-4 mr-1" />
-                        Нет в наличии
-                      </>
-                    )}
-                  </div>
+                  {!isReady && blockingReasons.length > 0 && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <div className="flex items-start space-x-2">
+                        <XCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-red-900 mb-1">
+                            Блокирующие причины:
+                          </div>
+                          <ul className="text-sm text-red-700 space-y-1">
+                            {blockingReasons.map((reason, i) => (
+                              <li key={i}>• {reason}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {warnings.length > 0 && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                      <div className="flex items-start space-x-2">
+                        <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-yellow-900 mb-1">
+                            Предупреждения (не блокируют продажу):
+                          </div>
+                          <ul className="text-sm text-yellow-700 space-y-1">
+                            {warnings.map((warning, i) => (
+                              <li key={i}>• {warning}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
