@@ -1,0 +1,85 @@
+/*
+  # Fix calculate_product_quality function
+
+  1. Changes
+    - Update function to use supplier_category_id instead of category_id
+    - Fix category quality template lookup
+*/
+
+-- Drop and recreate the function with correct fields
+CREATE OR REPLACE FUNCTION calculate_product_quality(p_product_id integer)
+RETURNS void AS $$
+DECLARE
+  v_product record;
+  v_template record;
+  v_score integer := 0;
+  v_reasons jsonb := '[]'::jsonb;
+  v_has_selling_price boolean := false;
+  v_has_images boolean := false;
+  v_has_category boolean := false;
+  v_has_required_attributes boolean := true;
+BEGIN
+  SELECT * INTO v_product FROM products WHERE id = p_product_id;
+
+  IF NOT FOUND THEN
+    RETURN;
+  END IF;
+
+  -- Check if supplier category is assigned
+  IF v_product.supplier_category_id IS NOT NULL THEN
+    v_has_category := true;
+    v_score := v_score + 25;
+  ELSE
+    v_reasons := v_reasons || jsonb_build_object('code', 'no_category', 'message', 'Category not assigned');
+  END IF;
+
+  -- Check images
+  IF jsonb_array_length(v_product.images) > 0 THEN
+    v_has_images := true;
+    v_score := v_score + 25;
+  ELSE
+    v_reasons := v_reasons || jsonb_build_object('code', 'no_images', 'message', 'No product images');
+  END IF;
+
+  -- Check selling price
+  IF EXISTS (SELECT 1 FROM product_prices WHERE product_id = p_product_id AND price_type = 'selling' AND value > 0) THEN
+    v_has_selling_price := true;
+    v_score := v_score + 25;
+  ELSE
+    v_reasons := v_reasons || jsonb_build_object('code', 'no_selling_price', 'message', 'Selling price not set');
+  END IF;
+
+  -- Check category quality template if category is mapped to internal category
+  IF v_has_category THEN
+    -- Get internal category id through category mapping
+    SELECT ct.* INTO v_template 
+    FROM category_quality_templates ct
+    INNER JOIN category_mappings cm ON cm.internal_category_id = ct.category_id
+    WHERE cm.supplier_category_id = v_product.supplier_category_id;
+    
+    IF FOUND THEN
+      IF jsonb_array_length(v_product.images) < v_template.minimum_image_count THEN
+        v_reasons := v_reasons || jsonb_build_object(
+          'code', 'insufficient_images',
+          'message', format('Need at least %s images', v_template.minimum_image_count)
+        );
+        v_has_required_attributes := false;
+      END IF;
+    END IF;
+  END IF;
+
+  -- Check stock
+  IF v_product.total_stock >= 0 THEN
+    v_score := v_score + 25;
+  ELSE
+    v_reasons := v_reasons || jsonb_build_object('code', 'invalid_stock', 'message', 'Stock quantity is invalid');
+  END IF;
+
+  -- Update product with quality score
+  UPDATE products
+  SET 
+    completeness_score = v_score,
+    is_ready = (v_score = 100 AND v_has_required_attributes)
+  WHERE id = p_product_id;
+END;
+$$ LANGUAGE plpgsql;
