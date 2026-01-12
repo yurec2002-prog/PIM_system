@@ -14,7 +14,7 @@ import {
   ExternalLink,
   AlertCircle
 } from 'lucide-react';
-import { AttributeConflictResolver } from '../Attributes/AttributeConflictResolver';
+import { SKUAttributesTable } from './SKUAttributesTable';
 
 interface Product {
   id: string;
@@ -93,6 +93,8 @@ export function ProductDetails({ productId, onClose }: ProductDetailsProps) {
   const [stockExpanded, setStockExpanded] = useState(false);
   const [attributeSearch, setAttributeSearch] = useState('');
   const [showAllAttributes, setShowAllAttributes] = useState(false);
+  const [skuAttributes, setSkuAttributes] = useState<any[]>([]);
+  const [loadingAttributes, setLoadingAttributes] = useState(false);
 
   const pricesRef = useRef<HTMLDivElement>(null);
   const stockRef = useRef<HTMLDivElement>(null);
@@ -106,6 +108,21 @@ export function ProductDetails({ productId, onClose }: ProductDetailsProps) {
 
   const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const loadSkuAttributes = async (skuId: string) => {
+    setLoadingAttributes(true);
+
+    const { data, error } = await supabase
+      .rpc('get_sku_attributes_with_sources', {
+        p_internal_sku_id: skuId
+      });
+
+    if (!error && data) {
+      setSkuAttributes(data);
+    }
+
+    setLoadingAttributes(false);
   };
 
   const copyToClipboard = (text: string) => {
@@ -202,6 +219,7 @@ export function ProductDetails({ productId, onClose }: ProductDetailsProps) {
 
     if (skuLinkData) {
       setInternalSkuId(skuLinkData.internal_sku_id);
+      loadSkuAttributes(skuLinkData.internal_sku_id);
     }
 
     const { data: pricesData } = await supabase
@@ -732,8 +750,22 @@ export function ProductDetails({ productId, onClose }: ProductDetailsProps) {
           </div>
 
           <div ref={attributesRef} className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Атрибуты SKU
+            </h3>
             {internalSkuId ? (
-              <AttributeConflictResolver internalSkuId={internalSkuId} />
+              loadingAttributes ? (
+                <div className="text-center py-8 text-gray-500">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="mt-2">Загрузка атрибутов...</p>
+                </div>
+              ) : (
+                <SKUAttributesTable
+                  skuId={internalSkuId}
+                  attributes={skuAttributes}
+                  onUpdate={() => loadSkuAttributes(internalSkuId)}
+                />
+              )
             ) : (
               <div className="text-center py-8 text-gray-500">
                 <p>Товар не привязан к внутреннему SKU</p>
