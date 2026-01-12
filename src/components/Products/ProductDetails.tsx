@@ -81,6 +81,7 @@ interface ProductDetailsProps {
 
 export function ProductDetails({ productId, onClose }: ProductDetailsProps) {
   const [product, setProduct] = useState<Product | null>(null);
+  const [internalSkuId, setInternalSkuId] = useState<string | null>(null);
   const [prices, setPrices] = useState<Price[]>([]);
   const [stocks, setStocks] = useState<WarehouseStock[]>([]);
   const [brand, setBrand] = useState<Brand | null>(null);
@@ -191,6 +192,16 @@ export function ProductDetails({ productId, onClose }: ProductDetailsProps) {
     if (productError || !productData) {
       setLoading(false);
       return;
+    }
+
+    const { data: skuLinkData } = await supabase
+      .from('sku_links')
+      .select('internal_sku_id')
+      .eq('supplier_product_id', productId)
+      .maybeSingle();
+
+    if (skuLinkData) {
+      setInternalSkuId(skuLinkData.internal_sku_id);
     }
 
     const { data: pricesData } = await supabase
@@ -721,7 +732,13 @@ export function ProductDetails({ productId, onClose }: ProductDetailsProps) {
           </div>
 
           <div ref={attributesRef} className="bg-white border border-gray-200 rounded-lg p-6">
-            <AttributeConflictResolver internalSkuId={product.id} />
+            {internalSkuId ? (
+              <AttributeConflictResolver internalSkuId={internalSkuId} />
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>Товар не привязан к внутреннему SKU</p>
+              </div>
+            )}
 
             <div className="mt-6 pt-6 border-t border-gray-200">
               <div className="flex items-center justify-between mb-4">
