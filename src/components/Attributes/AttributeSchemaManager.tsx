@@ -19,7 +19,6 @@ interface MasterAttribute {
 interface InternalCategory {
   id: string;
   name: string;
-  name_ru: string;
 }
 
 interface Supplier {
@@ -52,7 +51,7 @@ export const AttributeSchemaManager: React.FC = () => {
   const loadCategories = async () => {
     const { data, error } = await supabase
       .from('internal_categories')
-      .select('id, name, name_ru')
+      .select('id, name')
       .order('name');
 
     if (!error && data) {
@@ -325,7 +324,7 @@ export const AttributeSchemaManager: React.FC = () => {
             <option value="">Choose a category...</option>
             {categories.map(cat => (
               <option key={cat.id} value={cat.id}>
-                {cat.name} ({cat.name_ru})
+                {cat.name}
               </option>
             ))}
           </select>
