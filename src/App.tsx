@@ -12,6 +12,7 @@ import { SupplierCategoryTree } from './components/Categories/SupplierCategoryTr
 import { Export } from './components/Export/Export';
 import { CategoryQualityTemplates } from './components/Quality/CategoryQualityTemplates';
 import { QualityLogs } from './components/Quality/QualityLogs';
+import { AttributeSchemaManager } from './components/Attributes/AttributeSchemaManager';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -62,6 +63,7 @@ function AppContent() {
       )}
       {activeTab === 'category-tree' && <SupplierCategoryTree />}
       {activeTab === 'mapping' && <CategoryMapping />}
+      {activeTab === 'attribute-schema' && <AttributeSchemaManager />}
       {activeTab === 'quality-templates' && <CategoryQualityTemplates />}
       {activeTab === 'quality-logs' && <QualityLogs />}
       {activeTab === 'export' && <Export />}

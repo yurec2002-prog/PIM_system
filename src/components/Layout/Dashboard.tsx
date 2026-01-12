@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Package, Upload, Link2, Download, LogOut, Menu, X, FolderTree, FileText, Settings, Activity } from 'lucide-react';
+import { Package, Upload, Link2, Download, LogOut, Menu, X, FolderTree, FileText, Settings, Activity, ListTree } from 'lucide-react';
 
 interface DashboardProps {
   children: React.ReactNode;
@@ -18,6 +18,7 @@ export function Dashboard({ children, activeTab, onTabChange }: DashboardProps) 
     { id: 'products', name: 'Products', icon: Package },
     { id: 'category-tree', name: 'Category Tree', icon: FolderTree },
     { id: 'mapping', name: 'Category Mapping', icon: Link2 },
+    { id: 'attribute-schema', name: 'Attribute Schema', icon: ListTree },
     { id: 'quality-templates', name: 'Quality Templates', icon: Settings },
     { id: 'quality-logs', name: 'Quality Logs', icon: Activity },
     { id: 'export', name: 'Export', icon: Download },

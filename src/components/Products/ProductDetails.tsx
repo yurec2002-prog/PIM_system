@@ -14,6 +14,7 @@ import {
   ExternalLink,
   AlertCircle
 } from 'lucide-react';
+import { AttributeConflictResolver } from '../Attributes/AttributeConflictResolver';
 
 interface Product {
   id: string;
@@ -720,69 +721,73 @@ export function ProductDetails({ productId, onClose }: ProductDetailsProps) {
           </div>
 
           <div ref={attributesRef} className="bg-white border border-gray-200 rounded-lg p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Атрибуты
-              </h3>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Поиск..."
-                  value={attributeSearch}
-                  onChange={(e) => setAttributeSearch(e.target.value)}
-                  className="pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+            <AttributeConflictResolver internalSkuId={product.id} />
+
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Сырые атрибуты от поставщика
+                </h3>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Поиск..."
+                    value={attributeSearch}
+                    onChange={(e) => setAttributeSearch(e.target.value)}
+                    className="pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
               </div>
+
+              {(importantAttrs.length > 0 || otherAttrs.length > 0) ? (
+                <div className="space-y-4">
+                  {importantAttrs.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Основные характеристики</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {importantAttrs.map(([key, value]) => (
+                          <div key={key} className="bg-blue-50 rounded-lg p-3">
+                            <div className="text-xs text-blue-700 font-medium mb-1">{key}</div>
+                            <div className="text-sm text-gray-900 font-semibold">{String(value)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {otherAttrs.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-medium text-gray-700">
+                          Дополнительные характеристики ({otherAttrs.length})
+                        </h4>
+                        {otherAttrs.length > 10 && (
+                          <button
+                            onClick={() => setShowAllAttributes(!showAllAttributes)}
+                            className="text-sm text-blue-600 hover:text-blue-700"
+                          >
+                            {showAllAttributes ? 'Скрыть' : 'Показать все'}
+                          </button>
+                        )}
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                        {(showAllAttributes ? otherAttrs : otherAttrs.slice(0, 10)).map(([key, value]) => (
+                          <div key={key} className="flex justify-between text-sm border-b border-gray-200 last:border-0 pb-2 last:pb-0">
+                            <span className="text-gray-600">{key}</span>
+                            <span className="text-gray-900 font-medium text-right ml-4">{String(value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p>Атрибуты отсутствуют</p>
+                </div>
+              )}
             </div>
-
-            {(importantAttrs.length > 0 || otherAttrs.length > 0) ? (
-              <div className="space-y-4">
-                {importantAttrs.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">Основные характеристики</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {importantAttrs.map(([key, value]) => (
-                        <div key={key} className="bg-blue-50 rounded-lg p-3">
-                          <div className="text-xs text-blue-700 font-medium mb-1">{key}</div>
-                          <div className="text-sm text-gray-900 font-semibold">{String(value)}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {otherAttrs.length > 0 && (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-medium text-gray-700">
-                        Дополнительные характеристики ({otherAttrs.length})
-                      </h4>
-                      {otherAttrs.length > 10 && (
-                        <button
-                          onClick={() => setShowAllAttributes(!showAllAttributes)}
-                          className="text-sm text-blue-600 hover:text-blue-700"
-                        >
-                          {showAllAttributes ? 'Скрыть' : 'Показать все'}
-                        </button>
-                      )}
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                      {(showAllAttributes ? otherAttrs : otherAttrs.slice(0, 10)).map(([key, value]) => (
-                        <div key={key} className="flex justify-between text-sm border-b border-gray-200 last:border-0 pb-2 last:pb-0">
-                          <span className="text-gray-600">{key}</span>
-                          <span className="text-gray-900 font-medium text-right ml-4">{String(value)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <p>Атрибуты отсутствуют</p>
-              </div>
-            )}
           </div>
 
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
