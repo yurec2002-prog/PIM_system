@@ -813,9 +813,9 @@ export function AttributeSchemaManager() {
             <p>Select a supplier to begin attribute schema management</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-6">
-            <div className="flex flex-col gap-4">
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col" style={{ height: '400px' }}>
+          <div className="grid grid-cols-2 gap-6" style={{ height: 'calc(100vh - 280px)' }}>
+            <div className="flex flex-col gap-4 h-full">
+              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col" style={{ height: '400px', flexShrink: 0 }}>
                 <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex-shrink-0">
                   <div className="flex items-center justify-between">
                     <h2 className="text-lg font-semibold text-gray-900">
@@ -853,8 +853,8 @@ export function AttributeSchemaManager() {
               </div>
 
               {selectedSupplierCategoryData && (
-                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                  <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col flex-1">
+                  <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex-shrink-0">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
                         <h3 className="font-semibold text-gray-900 mb-1">
@@ -951,7 +951,7 @@ export function AttributeSchemaManager() {
 
                   </div>
 
-                  <div className="p-4 max-h-96 overflow-y-auto">
+                  <div className="p-4 overflow-y-auto flex-1">
                     <div className="space-y-2">
                       {filteredAttributes.map((attr) => (
                         <SupplierAttributeRow
@@ -974,8 +974,8 @@ export function AttributeSchemaManager() {
               )}
             </div>
 
-            <div className="flex flex-col gap-4">
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col" style={{ height: '400px' }}>
+            <div className="flex flex-col gap-4 h-full">
+              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col" style={{ height: '400px', flexShrink: 0 }}>
               <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex-shrink-0">
                 <h2 className="text-lg font-semibold text-gray-900">
                   Internal (Master) Categories
@@ -992,8 +992,8 @@ export function AttributeSchemaManager() {
               </div>
 
               {selectedInternalCategoryData && (
-                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                  <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col flex-1">
+                  <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex-shrink-0">
                     <h3 className="font-semibold text-gray-900 mb-1">
                       {selectedInternalCategoryData.name}
                     </h3>
@@ -1002,7 +1002,7 @@ export function AttributeSchemaManager() {
                     </div>
                   </div>
 
-                  <div className="p-4">
+                  <div className="p-4 overflow-y-auto flex-1">
                     {selectedInternalCategoryData.description && (
                       <p className="text-sm text-gray-600 mb-3">
                         {selectedInternalCategoryData.description}
