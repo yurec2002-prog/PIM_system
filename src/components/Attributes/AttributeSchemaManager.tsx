@@ -1,24 +1,84 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Save, X, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import {
+  Search,
+  CheckCircle,
+  AlertCircle,
+  Link2,
+  Plus,
+  Trash2,
+  Package,
+  Filter,
+  Info,
+  ImageIcon,
+  RefreshCw,
+  ArrowRight,
+  ExternalLink,
+  AlertTriangle,
+  Loader,
+  MapPin,
+  Sparkles,
+  ChevronDown,
+  ChevronRight
+} from 'lucide-react';
 
-interface MasterAttribute {
+interface AttributePresence {
   id: string;
-  internal_category_id: string;
+  attribute_name: string;
+  frequency_count: number;
+  example_values: string[];
+  mapped_master_attribute_id: string | null;
+  mapped_master_attribute?: {
+    id: string;
+    name: string;
+    type: string;
+    unit: string | null;
+  };
+}
+
+interface SupplierCategory {
+  id: string;
+  external_id: string;
   name: string;
-  type: 'text' | 'number' | 'select' | 'boolean';
-  unit: string | null;
-  is_required: boolean;
-  select_options: string[] | null;
-  synonyms: string[];
-  preferred_source_rule: string;
-  display_order: number;
-  is_pinned: boolean;
+  name_ru: string;
+  name_uk: string;
+  parent_id: string | null;
+  supplier_id: string;
+  image: string | null;
+  mapping: {
+    internal_category: { id: string; name: string };
+  } | null;
+  attributeStats: {
+    total_count: number;
+    mapped_count: number;
+    unmapped_count: number;
+    product_count: number;
+  };
+  children?: SupplierCategory[];
 }
 
 interface InternalCategory {
   id: string;
   name: string;
+  slug: string;
+  parent_id: string | null;
+  description: string | null;
+  image: string | null;
+  attributes: Array<{
+    id: string;
+    name: string;
+    type: string;
+    unit: string | null;
+    is_required: boolean;
+    synonyms: string[];
+    display_order: number;
+  }>;
+  attributeStats: {
+    total_count: number;
+    required_count: number;
+    missing_required_count: number;
+  };
+  children?: InternalCategory[];
 }
 
 interface Supplier {
@@ -26,414 +86,651 @@ interface Supplier {
   name: string;
 }
 
-export const AttributeSchemaManager: React.FC = () => {
-  const [categories, setCategories] = useState<InternalCategory[]>([]);
+export function AttributeSchemaManager() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [attributes, setAttributes] = useState<MasterAttribute[]>([]);
-  const [editingAttribute, setEditingAttribute] = useState<Partial<MasterAttribute> | null>(null);
-  const [isAdding, setIsAdding] = useState(false);
-  const [expandedAttribute, setExpandedAttribute] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState<string>('');
+  const [supplierCategories, setSupplierCategories] = useState<SupplierCategory[]>([]);
+  const [internalCategories, setInternalCategories] = useState<InternalCategory[]>([]);
+  const [selectedSupplierCategory, setSelectedSupplierCategory] = useState<string | null>(null);
+  const [selectedInternalCategory, setSelectedInternalCategory] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [rebuilding, setRebuilding] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [attributePresenceList, setAttributePresenceList] = useState<AttributePresence[]>([]);
+  const [filterMode, setFilterMode] = useState<'all' | 'unmapped' | 'mapped'>('all');
+  const [syncStats, setSyncStats] = useState<any>({
+    total_products: 0,
+    total_attributes: 0,
+    total_categories: 0,
+    mapped_attributes: 0,
+    unmapped_attributes: 0,
+  });
+  const [expandedSupplierIds, setExpandedSupplierIds] = useState<Set<string>>(new Set());
+  const [expandedInternalIds, setExpandedInternalIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    loadCategories();
     loadSuppliers();
+    loadInternalCategories();
   }, []);
 
   useEffect(() => {
-    if (selectedCategory) {
-      loadAttributes();
-    }
-  }, [selectedCategory]);
+    loadSyncStats();
+  }, [selectedSupplier]);
 
-  const loadCategories = async () => {
-    const { data, error } = await supabase
-      .from('internal_categories')
-      .select('id, name')
-      .order('name');
-
-    if (!error && data) {
-      setCategories(data);
+  useEffect(() => {
+    if (selectedSupplier) {
+      loadSupplierCategories();
+    } else {
+      setSupplierCategories([]);
     }
-  };
+  }, [selectedSupplier]);
+
+  useEffect(() => {
+    if (selectedSupplierCategory) {
+      loadCategoryAttributePresence();
+    }
+  }, [selectedSupplierCategory]);
 
   const loadSuppliers = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('suppliers')
       .select('id, name')
       .order('name');
-
-    if (!error && data) {
+    if (data) {
       setSuppliers(data);
+      if (data.length > 0 && !selectedSupplier) {
+        setSelectedSupplier(data[0].id);
+      }
     }
   };
 
-  const loadAttributes = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('master_attributes')
-      .select('*')
-      .eq('internal_category_id', selectedCategory)
-      .order('display_order');
-
-    if (!error && data) {
-      setAttributes(data);
+  const loadSyncStats = async () => {
+    if (!selectedSupplier) {
+      setSyncStats({
+        total_products: 0,
+        total_attributes: 0,
+        total_categories: 0,
+        mapped_attributes: 0,
+        unmapped_attributes: 0,
+      });
+      return;
     }
-    setLoading(false);
-  };
 
-  const handleSaveAttribute = async () => {
-    if (!editingAttribute || !selectedCategory) return;
+    console.log('Loading sync stats for supplier:', selectedSupplier);
 
-    setSaving(true);
+    const { count: productsCount, error: productsError } = await supabase
+      .from('supplier_products')
+      .select('*', { count: 'exact', head: true })
+      .eq('supplier_id', selectedSupplier);
 
-    const attributeData = {
-      internal_category_id: selectedCategory,
-      name: editingAttribute.name,
-      type: editingAttribute.type,
-      unit: editingAttribute.unit || null,
-      is_required: editingAttribute.is_required || false,
-      select_options: editingAttribute.select_options || null,
-      synonyms: editingAttribute.synonyms || [],
-      preferred_source_rule: editingAttribute.preferred_source_rule || 'manual',
-      display_order: editingAttribute.display_order || attributes.length,
-      is_pinned: editingAttribute.is_pinned || false,
+    console.log('Products count:', productsCount, 'Error:', productsError);
+
+    const { count: categoriesCount, error: categoriesError } = await supabase
+      .from('supplier_categories')
+      .select('*', { count: 'exact', head: true })
+      .eq('supplier_id', selectedSupplier);
+
+    console.log('Categories count:', categoriesCount, 'Error:', categoriesError);
+
+    const { count: presenceCount, error: presenceError } = await supabase
+      .from('supplier_category_attribute_presence')
+      .select('*', { count: 'exact', head: true })
+      .eq('supplier_id', selectedSupplier);
+
+    console.log('Attributes count:', presenceCount, 'Error:', presenceError);
+
+    const { count: mappedCount, error: mappedError } = await supabase
+      .from('supplier_category_attribute_presence')
+      .select('*', { count: 'exact', head: true })
+      .eq('supplier_id', selectedSupplier)
+      .not('mapped_master_attribute_id', 'is', null);
+
+    console.log('Mapped count:', mappedCount, 'Error:', mappedError);
+
+    const stats = {
+      total_products: productsCount || 0,
+      total_attributes: presenceCount || 0,
+      total_categories: categoriesCount || 0,
+      mapped_attributes: mappedCount || 0,
+      unmapped_attributes: (presenceCount || 0) - (mappedCount || 0),
     };
 
-    if (editingAttribute.id) {
-      const { error } = await supabase
-        .from('master_attributes')
-        .update(attributeData)
-        .eq('id', editingAttribute.id);
-
-      if (!error) {
-        await loadAttributes();
-        setEditingAttribute(null);
-      }
-    } else {
-      const { error } = await supabase
-        .from('master_attributes')
-        .insert(attributeData);
-
-      if (!error) {
-        await loadAttributes();
-        setEditingAttribute(null);
-        setIsAdding(false);
-      }
-    }
-
-    setSaving(false);
+    console.log('Setting sync stats:', stats);
+    setSyncStats(stats);
   };
 
-  const handleDeleteAttribute = async (id: string) => {
-    if (!confirm('Delete this attribute? This will remove all values for this attribute.')) return;
-
-    const { error } = await supabase
-      .from('master_attributes')
-      .delete()
-      .eq('id', id);
-
-    if (!error) {
-      await loadAttributes();
-    }
-  };
-
-  const handleSyncSupplierAttributes = async () => {
+  const loadSupplierCategories = async () => {
     setLoading(true);
-    const { error } = await supabase.rpc('sync_supplier_attributes_to_master');
+    const { data, error } = await supabase
+      .from('supplier_categories')
+      .select(`
+        *,
+        mapping:supplier_category_mappings(
+          internal_category:internal_categories(id, name)
+        )
+      `)
+      .eq('supplier_id', selectedSupplier)
+      .order('name');
 
-    if (!error) {
-      alert('Supplier attributes synchronized successfully!');
-    } else {
-      alert('Error syncing: ' + error.message);
+    if (!error && data) {
+      const { data: attrStats } = await supabase
+        .from('supplier_category_attribute_presence')
+        .select('supplier_category_id, attribute_name, mapped_master_attribute_id')
+        .eq('supplier_id', selectedSupplier);
+
+      const { data: productCounts } = await supabase
+        .from('supplier_products')
+        .select('supplier_category_id')
+        .eq('supplier_id', selectedSupplier);
+
+      const categoriesWithStats = data.map(cat => {
+        const attrs = attrStats?.filter(a => a.supplier_category_id === cat.id) || [];
+        const productCount = productCounts?.filter(p => p.supplier_category_id === cat.id).length || 0;
+        const total_count = attrs.length;
+        const mapped_count = attrs.filter(a => a.mapped_master_attribute_id).length;
+
+        return {
+          ...cat,
+          mapping: cat.mapping?.[0] || null,
+          attributeStats: {
+            total_count,
+            mapped_count,
+            unmapped_count: total_count - mapped_count,
+            product_count: productCount
+          }
+        };
+      });
+
+      const tree = buildTree(categoriesWithStats);
+      setSupplierCategories(tree);
     }
     setLoading(false);
   };
 
-  const renderAttributeForm = (attr: Partial<MasterAttribute>) => {
-    return (
-      <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Attribute Name
-            </label>
-            <input
-              type="text"
-              value={attr.name || ''}
-              onChange={(e) => setEditingAttribute({ ...attr, name: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg"
-              placeholder="e.g., Material, Weight, Color"
-            />
-          </div>
+  const loadInternalCategories = async () => {
+    const { data, error } = await supabase
+      .from('internal_categories')
+      .select('*')
+      .order('name');
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Type
-            </label>
-            <select
-              value={attr.type || 'text'}
-              onChange={(e) => setEditingAttribute({ ...attr, type: e.target.value as any })}
-              className="w-full px-3 py-2 border rounded-lg"
-            >
-              <option value="text">Text</option>
-              <option value="number">Number</option>
-              <option value="select">Select</option>
-              <option value="boolean">Boolean</option>
-            </select>
-          </div>
+    if (!error && data) {
+      const categoriesWithStats = data.map(cat => ({
+        ...cat,
+        attributes: [],
+        attributeStats: {
+          total_count: 0,
+          required_count: 0,
+          missing_required_count: 0
+        }
+      }));
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Unit
-            </label>
-            <input
-              type="text"
-              value={attr.unit || ''}
-              onChange={(e) => setEditingAttribute({ ...attr, unit: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg"
-              placeholder="e.g., cm, kg, W"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Preferred Source
-            </label>
-            <select
-              value={attr.preferred_source_rule || 'manual'}
-              onChange={(e) => setEditingAttribute({ ...attr, preferred_source_rule: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg"
-            >
-              <option value="manual">Manual</option>
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
-              {suppliers.map(s => (
-                <option key={s.id} value={`supplier:${s.id}`}>Supplier: {s.name}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {attr.type === 'select' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Select Options (comma-separated)
-            </label>
-            <input
-              type="text"
-              value={attr.select_options?.join(', ') || ''}
-              onChange={(e) => setEditingAttribute({
-                ...attr,
-                select_options: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
-              })}
-              className="w-full px-3 py-2 border rounded-lg"
-              placeholder="Option 1, Option 2, Option 3"
-            />
-          </div>
-        )}
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Synonyms (comma-separated supplier attribute names)
-          </label>
-          <input
-            type="text"
-            value={attr.synonyms?.join(', ') || ''}
-            onChange={(e) => setEditingAttribute({
-              ...attr,
-              synonyms: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
-            })}
-            className="w-full px-3 py-2 border rounded-lg"
-            placeholder="e.g., материал, material, Материал"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Supplier attributes matching these names will be mapped to this master attribute
-          </p>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={attr.is_required || false}
-              onChange={(e) => setEditingAttribute({ ...attr, is_required: e.target.checked })}
-              className="rounded"
-            />
-            <span className="text-sm">Required</span>
-          </label>
-
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={attr.is_pinned || false}
-              onChange={(e) => setEditingAttribute({ ...attr, is_pinned: e.target.checked })}
-              className="rounded"
-            />
-            <span className="text-sm">Pinned</span>
-          </label>
-        </div>
-
-        <div className="flex gap-2">
-          <button
-            onClick={handleSaveAttribute}
-            disabled={saving || !attr.name || !attr.type}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-          >
-            <Save className="w-4 h-4" />
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-          <button
-            onClick={() => {
-              setEditingAttribute(null);
-              setIsAdding(false);
-            }}
-            className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    );
+      const tree = buildTree(categoriesWithStats);
+      setInternalCategories(tree);
+    }
   };
 
-  return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="bg-white rounded-xl shadow-sm border p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold">Attribute Schema Manager</h2>
-          <button
-            onClick={handleSyncSupplierAttributes}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-          >
-            Sync Supplier Attributes
-          </button>
-        </div>
+  const loadCategoryAttributePresence = async () => {
+    if (!selectedSupplierCategory) return;
 
-        <div className="mb-6">
+    const { data, error } = await supabase
+      .from('supplier_category_attribute_presence')
+      .select(`
+        *,
+        mapped_master_attribute:master_attribute_dictionary(id, name_ru, type, unit)
+      `)
+      .eq('supplier_category_id', selectedSupplierCategory)
+      .order('frequency_count', { ascending: false });
+
+    if (!error && data) {
+      setAttributePresenceList(data.map(item => ({
+        id: item.id,
+        attribute_name: item.attribute_name,
+        frequency_count: item.frequency_count || 0,
+        example_values: Array.isArray(item.example_values) ? item.example_values : [],
+        mapped_master_attribute_id: item.mapped_master_attribute_id,
+        mapped_master_attribute: item.mapped_master_attribute ? {
+          id: item.mapped_master_attribute.id,
+          name: item.mapped_master_attribute.name_ru,
+          type: item.mapped_master_attribute.type,
+          unit: item.mapped_master_attribute.unit
+        } : undefined
+      })));
+    }
+  };
+
+  const buildTree = <T extends { id: string; parent_id: string | null }>(
+    items: T[]
+  ): (T & { children?: T[] })[] => {
+    const map = new Map<string, T & { children?: T[] }>();
+    items.forEach(item => map.set(item.id, { ...item, children: [] }));
+
+    const tree: (T & { children?: T[] })[] = [];
+    map.forEach(item => {
+      if (item.parent_id && map.has(item.parent_id)) {
+        const parent = map.get(item.parent_id)!;
+        if (!parent.children) parent.children = [];
+        parent.children.push(item);
+      } else {
+        tree.push(item);
+      }
+    });
+
+    return tree;
+  };
+
+  const toggleExpandSupplier = (id: string) => {
+    const newSet = new Set(expandedSupplierIds);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setExpandedSupplierIds(newSet);
+  };
+
+  const toggleExpandInternal = (id: string) => {
+    const newSet = new Set(expandedInternalIds);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setExpandedInternalIds(newSet);
+  };
+
+  const renderSupplierCategoryTree = (categories: SupplierCategory[], depth = 0) => {
+    return categories.map(category => {
+      const isExpanded = expandedSupplierIds.has(category.id);
+      const hasChildren = category.children && category.children.length > 0;
+      const isSelected = selectedSupplierCategory === category.id;
+
+      return (
+        <div key={category.id}>
+          <div
+            className={`flex items-center gap-2 py-2 px-3 cursor-pointer hover:bg-blue-50 rounded ${
+              isSelected ? 'bg-blue-100 border-l-4 border-blue-500' : ''
+            }`}
+            style={{ paddingLeft: `${depth * 20 + 12}px` }}
+            onClick={() => setSelectedSupplierCategory(category.id)}
+          >
+            {hasChildren && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleExpandSupplier(category.id);
+                }}
+                className="p-0.5 hover:bg-blue-200 rounded"
+              >
+                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              </button>
+            )}
+            {!hasChildren && <div className="w-5" />}
+
+            <div className="flex-1">
+              <div className="text-sm font-medium text-gray-900">
+                {category.name_ru || category.name}
+              </div>
+              {category.attributeStats.total_count > 0 && (
+                <div className="flex gap-3 text-xs text-gray-500 mt-1">
+                  <span className="flex items-center gap-1">
+                    <Package size={12} />
+                    {category.attributeStats.product_count}
+                  </span>
+                  <span className="flex items-center gap-1 text-blue-600">
+                    <Link2 size={12} />
+                    {category.attributeStats.total_count} attrs
+                  </span>
+                  {category.attributeStats.mapped_count > 0 && (
+                    <span className="text-green-600">
+                      {category.attributeStats.mapped_count} mapped
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {category.mapping && (
+              <div className="flex items-center gap-1 text-green-600">
+                <CheckCircle size={14} />
+              </div>
+            )}
+          </div>
+
+          {hasChildren && isExpanded && renderSupplierCategoryTree(category.children!, depth + 1)}
+        </div>
+      );
+    });
+  };
+
+  const renderInternalCategoryTree = (categories: InternalCategory[], depth = 0) => {
+    return categories.map(category => {
+      const isExpanded = expandedInternalIds.has(category.id);
+      const hasChildren = category.children && category.children.length > 0;
+      const isSelected = selectedInternalCategory === category.id;
+
+      return (
+        <div key={category.id}>
+          <div
+            className={`flex items-center gap-2 py-2 px-3 cursor-pointer hover:bg-green-50 rounded ${
+              isSelected ? 'bg-green-100 border-l-4 border-green-500' : ''
+            }`}
+            style={{ paddingLeft: `${depth * 20 + 12}px` }}
+            onClick={() => setSelectedInternalCategory(category.id)}
+          >
+            {hasChildren && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleExpandInternal(category.id);
+                }}
+                className="p-0.5 hover:bg-green-200 rounded"
+              >
+                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              </button>
+            )}
+            {!hasChildren && <div className="w-5" />}
+
+            <div className="flex-1">
+              <div className="text-sm font-medium text-gray-900">{category.name}</div>
+              {category.attributeStats.total_count > 0 && (
+                <div className="text-xs text-gray-500 mt-1">
+                  {category.attributeStats.total_count} attributes
+                  {category.attributeStats.required_count > 0 && (
+                    <span className="ml-2 text-orange-600">
+                      {category.attributeStats.required_count} required
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {hasChildren && isExpanded && renderInternalCategoryTree(category.children!, depth + 1)}
+        </div>
+      );
+    });
+  };
+
+  const getSupplierCategoryById = (id: string): SupplierCategory | null => {
+    const findInTree = (categories: SupplierCategory[]): SupplierCategory | null => {
+      for (const cat of categories) {
+        if (cat.id === id) return cat;
+        if (cat.children) {
+          const found = findInTree(cat.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    return findInTree(supplierCategories);
+  };
+
+  const getCategoryPath = (categoryId: string, categories: SupplierCategory[]): string => {
+    const findPath = (cats: SupplierCategory[], path: string[] = []): string[] | null => {
+      for (const cat of cats) {
+        const currentPath = [...path, cat.name_ru || cat.name];
+        if (cat.id === categoryId) return currentPath;
+        if (cat.children) {
+          const found = findPath(cat.children, currentPath);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    const path = findPath(categories);
+    return path ? path.join(' > ') : '';
+  };
+
+  const filteredAttributes = attributePresenceList.filter(attr => {
+    if (filterMode === 'mapped' && !attr.mapped_master_attribute_id) return false;
+    if (filterMode === 'unmapped' && attr.mapped_master_attribute_id) return false;
+    if (searchQuery && !attr.attribute_name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    return true;
+  });
+
+  const selectedSupplierCategoryData = selectedSupplierCategory
+    ? getSupplierCategoryById(selectedSupplierCategory)
+    : null;
+
+  return (
+    <div className="p-6 max-w-[1800px] mx-auto">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Attribute Schema Manager</h1>
+        <p className="text-gray-600">
+          Manage attribute mappings between supplier categories and internal master categories
+        </p>
+      </div>
+
+      <div className="mb-6 grid grid-cols-3 gap-4">
+        <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Select Category
+            Supplier
           </label>
           <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="w-full px-4 py-2 border rounded-lg"
+            value={selectedSupplier}
+            onChange={(e) => setSelectedSupplier(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">Choose a category...</option>
-            {categories.map(cat => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
+            <option value="">Select Supplier</option>
+            {suppliers.map((supplier) => (
+              <option key={supplier.id} value={supplier.id}>
+                {supplier.name}
               </option>
             ))}
           </select>
         </div>
 
-        {selectedCategory && (
-          <>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Attributes</h3>
-              {!isAdding && (
-                <button
-                  onClick={() => {
-                    setIsAdding(true);
-                    setEditingAttribute({
-                      type: 'text',
-                      synonyms: [],
-                      preferred_source_rule: 'manual',
-                      is_required: false,
-                      is_pinned: false
-                    });
-                  }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Attribute
-                </button>
+        <div className="col-span-2">
+          {syncStats && (
+            <div className="grid grid-cols-5 gap-3">
+              <div className="bg-white rounded-lg border border-gray-200 p-3">
+                <div className="text-xs text-gray-500 mb-1">Products</div>
+                <div className="text-lg font-bold text-gray-900">{syncStats.total_products}</div>
+              </div>
+              <div className="bg-white rounded-lg border border-gray-200 p-3">
+                <div className="text-xs text-gray-500 mb-1">Categories</div>
+                <div className="text-lg font-bold text-gray-900">{syncStats.total_categories}</div>
+              </div>
+              <div className="bg-white rounded-lg border border-gray-200 p-3">
+                <div className="text-xs text-gray-500 mb-1">Attributes</div>
+                <div className="text-lg font-bold text-gray-900">{syncStats.total_attributes}</div>
+              </div>
+              <div className="bg-white rounded-lg border border-green-200 p-3">
+                <div className="text-xs text-green-600 mb-1">Mapped</div>
+                <div className="text-lg font-bold text-green-700">{syncStats.mapped_attributes}</div>
+              </div>
+              <div className="bg-white rounded-lg border border-orange-200 p-3">
+                <div className="text-xs text-orange-600 mb-1">Unmapped</div>
+                <div className="text-lg font-bold text-orange-700">{syncStats.unmapped_attributes}</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {!selectedSupplier ? (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+          <Info className="w-12 h-12 text-blue-500 mx-auto mb-3" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Select a Supplier</h3>
+          <p className="text-gray-600">Choose a supplier from the dropdown to view and manage attribute mappings</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-6">
+          <div className="bg-white rounded-lg border border-gray-200">
+            <div className="p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Package size={20} className="text-blue-600" />
+                Supplier Categories
+              </h2>
+              {selectedSupplierCategoryData && (
+                <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="space-y-2">
+                    <div>
+                      <div className="text-xs text-gray-500">Selected Category</div>
+                      <div className="font-semibold text-gray-900">
+                        {selectedSupplierCategoryData.name_ru || selectedSupplierCategoryData.name}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {getCategoryPath(selectedSupplierCategory!, supplierCategories)}
+                      </div>
+                      {selectedSupplierCategoryData.attributeStats.product_count > 0 && (
+                        <div className="text-xs text-gray-600 mt-1">
+                          {selectedSupplierCategoryData.attributeStats.product_count} products
+                        </div>
+                      )}
+                      {selectedSupplierCategoryData.attributeStats.total_count > 0 && (
+                        <div className="text-xs text-gray-600">
+                          {selectedSupplierCategoryData.attributeStats.total_count} attributes
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {selectedSupplierCategoryData.mapping && (
+                    <div className="mt-2 pt-2 border-t border-blue-300">
+                      <div className="flex items-center gap-2 text-xs text-green-700">
+                        <CheckCircle size={14} />
+                        <span className="font-medium">
+                          Mapped to: {selectedSupplierCategoryData.mapping.internal_category.name}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
+            <div className="p-4 max-h-[600px] overflow-y-auto">
+              {loading ? (
+                <div className="text-center py-8">
+                  <Loader className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">Loading categories...</p>
+                </div>
+              ) : supplierCategories.length === 0 ? (
+                <div className="text-center py-8">
+                  <AlertCircle className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">No categories found</p>
+                </div>
+              ) : (
+                renderSupplierCategoryTree(supplierCategories)
+              )}
+            </div>
+          </div>
 
-            {isAdding && editingAttribute && renderAttributeForm(editingAttribute)}
+          <div className="bg-white rounded-lg border border-gray-200">
+            <div className="p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Sparkles size={20} className="text-green-600" />
+                Internal (Master) Categories
+              </h2>
+            </div>
+            <div className="p-4 max-h-[600px] overflow-y-auto">
+              {internalCategories.length === 0 ? (
+                <div className="text-center py-8">
+                  <AlertCircle className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">No internal categories found</p>
+                </div>
+              ) : (
+                renderInternalCategoryTree(internalCategories)
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
-            {loading ? (
-              <div className="text-center py-8 text-gray-500">Loading attributes...</div>
-            ) : (
-              <div className="space-y-3">
-                {attributes.length === 0 && !isAdding && (
-                  <div className="text-center py-8 text-gray-500">
-                    No attributes defined. Click "Add Attribute" to create one.
-                  </div>
-                )}
-
-                {attributes.map(attr => (
-                  <div key={attr.id} className="border rounded-lg p-4">
-                    {editingAttribute?.id === attr.id ? (
-                      renderAttributeForm(editingAttribute)
-                    ) : (
-                      <>
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3">
-                              <h4 className="font-semibold text-lg">{attr.name}</h4>
-                              <span className="px-2 py-1 bg-gray-100 text-xs rounded">{attr.type}</span>
-                              {attr.unit && <span className="text-sm text-gray-500">{attr.unit}</span>}
-                              {attr.is_required && <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded">Required</span>}
-                              {attr.is_pinned && <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">Pinned</span>}
-                            </div>
-                            <div className="text-sm text-gray-600 mt-1">
-                              Source: <span className="font-medium">{attr.preferred_source_rule}</span>
-                              {attr.synonyms.length > 0 && (
-                                <span className="ml-3">
-                                  Synonyms: {attr.synonyms.slice(0, 3).join(', ')}
-                                  {attr.synonyms.length > 3 && '...'}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => setExpandedAttribute(expandedAttribute === attr.id ? null : attr.id)}
-                              className="p-2 hover:bg-gray-100 rounded"
-                            >
-                              {expandedAttribute === attr.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                            </button>
-                            <button
-                              onClick={() => setEditingAttribute(attr)}
-                              className="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => handleDeleteAttribute(attr.id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {expandedAttribute === attr.id && (
-                          <div className="mt-3 pt-3 border-t text-sm space-y-2">
-                            {attr.select_options && (
-                              <div>
-                                <span className="font-medium">Options:</span> {attr.select_options.join(', ')}
-                              </div>
-                            )}
-                            <div>
-                              <span className="font-medium">All Synonyms:</span> {attr.synonyms.join(', ') || 'None'}
-                            </div>
-                          </div>
-                        )}
-                      </>
+      {selectedSupplierCategory && attributePresenceList.length > 0 && (
+        <div className="mt-6 bg-white rounded-lg border border-gray-200">
+          <div className="p-4 border-b border-gray-200">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Attributes ({filteredAttributes.length})
+              </h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setFilterMode('all')}
+                  className={`px-3 py-1.5 rounded text-sm ${
+                    filterMode === 'all'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setFilterMode('unmapped')}
+                  className={`px-3 py-1.5 rounded text-sm ${
+                    filterMode === 'unmapped'
+                      ? 'bg-orange-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Unmapped
+                </button>
+                <button
+                  onClick={() => setFilterMode('mapped')}
+                  className={`px-3 py-1.5 rounded text-sm ${
+                    filterMode === 'mapped'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Mapped
+                </button>
+              </div>
+            </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="text"
+                placeholder="Search attributes..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          <div className="p-4 space-y-2 max-h-[400px] overflow-y-auto">
+            {filteredAttributes.map((attr) => (
+              <div
+                key={attr.id}
+                className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900">{attr.attribute_name}</div>
+                  <div className="text-sm text-gray-500">
+                    {attr.frequency_count} products
+                    {attr.example_values.length > 0 && (
+                      <span className="ml-2">
+                        Examples: {attr.example_values.slice(0, 3).join(', ')}
+                      </span>
                     )}
                   </div>
-                ))}
+                  {attr.mapped_master_attribute && (
+                    <div className="mt-1 flex items-center gap-2 text-sm text-green-700">
+                      <CheckCircle size={14} />
+                      <span>Mapped to: {attr.mapped_master_attribute.name}</span>
+                      {attr.mapped_master_attribute.unit && (
+                        <span className="text-gray-500">({attr.mapped_master_attribute.unit})</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  {attr.mapped_master_attribute_id ? (
+                    <button className="px-3 py-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200 text-sm">
+                      <CheckCircle size={16} className="inline mr-1" />
+                      Mapped
+                    </button>
+                  ) : (
+                    <button className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+                      Map
+                    </button>
+                  )}
+                </div>
               </div>
-            )}
-          </>
-        )}
-      </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
-};
+}
