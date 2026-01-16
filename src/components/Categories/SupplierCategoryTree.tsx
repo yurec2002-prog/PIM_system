@@ -101,9 +101,9 @@ export function SupplierCategoryTree() {
         .in('supplier_category_id', categoriesData.map(c => c.id));
 
       const { data: productsData } = await supabase
-        .from('products')
+        .from('supplier_products')
         .select('id, name_ru, name_uk, vendor_code, is_ready, supplier_category_id, brand_ref')
-        .ilike('supplier', supplierData.name)
+        .eq('supplier_id', selectedSupplier)
         .not('supplier_category_id', 'is', null);
 
       const mappedIds = new Set(mappings?.map(m => m.supplier_category_id) || []);
@@ -118,7 +118,7 @@ export function SupplierCategoryTree() {
             productsByCategory.set(categoryId, []);
           }
           productsByCategory.get(categoryId)!.push({
-            id: product.id.toString(),
+            id: product.id,
             name: product.name_uk || product.name_ru || product.vendor_code || 'Unknown',
             vendor: product.brand_ref || '',
             model: product.vendor_code || '',
@@ -162,7 +162,7 @@ export function SupplierCategoryTree() {
       });
 
       const { data: productsData } = await supabase
-        .from('products')
+        .from('supplier_products')
         .select('id, name_ru, name_uk, vendor_code, is_ready, supplier_category_id, brand_ref')
         .not('supplier_category_id', 'is', null);
 
@@ -177,7 +177,7 @@ export function SupplierCategoryTree() {
             productsByCategory.set(internalCategoryId, []);
           }
           productsByCategory.get(internalCategoryId)!.push({
-            id: product.id.toString(),
+            id: product.id,
             name: product.name_uk || product.name_ru || product.vendor_code || 'Unknown',
             vendor: product.brand_ref || '',
             model: product.vendor_code || '',
