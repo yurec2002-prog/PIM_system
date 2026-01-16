@@ -18,7 +18,9 @@ import { SKUAttributesTable } from './SKUAttributesTable';
 
 interface Product {
   id: string;
-  supplier: string;
+  supplier_id?: string;
+  suppliers?: { name: string };
+  supplier?: string;
   supplier_sku: string;
   internal_sku: string | null;
   barcode: string | null;
@@ -201,8 +203,11 @@ export function ProductDetails({ productId, onClose }: ProductDetailsProps) {
     setLoading(true);
 
     const { data: productData, error: productError } = await supabase
-      .from('products')
-      .select('*')
+      .from('supplier_products')
+      .select(`
+        *,
+        suppliers!inner(name)
+      `)
       .eq('id', productId)
       .maybeSingle();
 
@@ -225,13 +230,13 @@ export function ProductDetails({ productId, onClose }: ProductDetailsProps) {
     const { data: pricesData } = await supabase
       .from('product_prices')
       .select('*')
-      .eq('product_id', productId)
+      .eq('supplier_product_id', productId)
       .order('price_type');
 
     const { data: stocksData } = await supabase
       .from('warehouse_stocks')
       .select('*')
-      .eq('product_id', productId)
+      .eq('supplier_product_id', productId)
       .order('warehouse_name');
 
     let brandData = null;
@@ -848,7 +853,7 @@ export function ProductDetails({ productId, onClose }: ProductDetailsProps) {
               </div>
               <div className="flex justify-between">
                 <dt className="text-gray-500">Поставщик</dt>
-                <dd className="text-gray-900 font-medium">{product.supplier}</dd>
+                <dd className="text-gray-900 font-medium">{product.suppliers?.name || product.supplier}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-gray-500">Последнее обновление</dt>

@@ -16,7 +16,9 @@ import {
 
 interface Product {
   id: string;
-  supplier: string;
+  supplier_id?: string;
+  suppliers?: { name: string };
+  supplier?: string;
   supplier_sku: string;
   internal_sku: string | null;
   barcode: string | null;
@@ -103,8 +105,11 @@ export function ProductsList({ onSelectProduct }: ProductsListProps) {
     setLoading(true);
 
     const { data: productsData } = await supabase
-      .from('products')
-      .select('*')
+      .from('supplier_products')
+      .select(`
+        *,
+        suppliers!inner(name)
+      `)
       .order('created_at', { ascending: false });
 
     if (!productsData) {
@@ -117,7 +122,7 @@ export function ProductsList({ onSelectProduct }: ProductsListProps) {
     const { data: pricesData } = await supabase
       .from('product_prices')
       .select('*')
-      .in('product_id', productIds);
+      .in('supplier_product_id', productIds);
 
     const brandRefs = [...new Set(productsData.filter(p => p.brand_ref).map(p => p.brand_ref))];
     const { data: brandsData } = await supabase
