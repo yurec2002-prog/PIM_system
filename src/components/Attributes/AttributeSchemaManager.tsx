@@ -508,7 +508,6 @@ export function AttributeSchemaManager() {
   };
 
   const aggregateStats = (category: any): any => {
-    // Use directProductCount from category directly (from DB column)
     const directProductCount = category.directProductCount || 0;
     const directTotalCount = category.attributeStats?.total_count || 0;
     const directMappedCount = category.attributeStats?.mapped_count || 0;
@@ -547,7 +546,7 @@ export function AttributeSchemaManager() {
       aggregatedStats.total_count += child.attributeStats?.total_count || 0;
       aggregatedStats.mapped_count += child.attributeStats?.mapped_count || 0;
       aggregatedStats.unmapped_count += child.attributeStats?.unmapped_count || 0;
-      aggregatedStats.product_count += child.directProductCount || 0;
+      aggregatedStats.product_count += child.attributeStats?.product_count || 0;
       aggregatedStats.required_count += child.attributeStats?.required_count || 0;
     });
 
@@ -561,6 +560,17 @@ export function AttributeSchemaManager() {
       directRequiredCount,
       children: aggregatedChildren,
     };
+  };
+
+  const handleOpenMasterCategory = (e: React.MouseEvent, categoryId: string) => {
+    e.stopPropagation();
+    const categoryData = getSupplierCategoryById(categoryId);
+    if (!categoryData?.mapping) {
+      alert('This supplier category is not mapped to an internal category yet.');
+      return;
+    }
+    const internalCatId = categoryData.mapping.internal_category.id;
+    setSelectedInternalCategory(internalCatId);
   };
 
   const renderSupplierCategoryTree = (categories: any[], level: number = 0) => {
@@ -610,7 +620,16 @@ export function AttributeSchemaManager() {
 
             <div className="flex items-center gap-2 flex-shrink-0">
               {category.mapping && (
-                <CheckCircle className="w-4 h-4 text-green-600" />
+                <>
+                  <button
+                    onClick={(e) => handleOpenMasterCategory(e, category.id)}
+                    className="p-1 hover:bg-blue-100 rounded transition-colors"
+                    title="Open master category"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-blue-600" />
+                  </button>
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                </>
               )}
 
               <div className="flex items-center gap-1 text-xs">
@@ -895,23 +914,44 @@ export function AttributeSchemaManager() {
                           className="w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
-                      <select
-                        value={filterMode}
-                        onChange={(e) => setFilterMode(e.target.value as any)}
-                        className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                    </div>
+
+                    <div className="flex items-center gap-2 mb-2">
+                      <button
+                        onClick={() => setFilterMode('all')}
+                        className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                          filterMode === 'all'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
                       >
-                        <option value="all">All</option>
-                        <option value="mapped">Mapped</option>
-                        <option value="unmapped">Unmapped</option>
-                      </select>
+                        All ({attributePresenceList.length})
+                      </button>
+                      <button
+                        onClick={() => setFilterMode('mapped')}
+                        className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                          filterMode === 'mapped'
+                            ? 'bg-green-600 text-white'
+                            : 'bg-green-100 text-green-700 hover:bg-green-200'
+                        }`}
+                      >
+                        Mapped ({attributePresenceList.filter(a => a.mapped_master_attribute_id).length})
+                      </button>
+                      <button
+                        onClick={() => setFilterMode('unmapped')}
+                        className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                          filterMode === 'unmapped'
+                            ? 'bg-orange-600 text-white'
+                            : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                        }`}
+                      >
+                        Unmapped ({attributePresenceList.filter(a => !a.mapped_master_attribute_id).length})
+                      </button>
                     </div>
 
                   </div>
 
-                  <div className="p-4">
-                    <div className="text-sm font-medium text-gray-700 mb-2">
-                      Attributes ({filteredAttributes.length})
-                    </div>
+                  <div className="p-4 max-h-96 overflow-y-auto">
                     <div className="space-y-2">
                       {filteredAttributes.map((attr) => (
                         <SupplierAttributeRow
