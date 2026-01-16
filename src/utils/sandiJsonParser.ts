@@ -77,7 +77,7 @@ interface ImportStats {
   brandsCreated: number;
   brandsUpdated: number;
   pricesUpdated: number;
-  imagesAdded: number;
+  imagesDownloaded: number;
   stockUpdated: number;
   errorsCount: number;
 }
@@ -119,7 +119,7 @@ export async function parseSandiJSON(
     brandsCreated: 0,
     brandsUpdated: 0,
     pricesUpdated: 0,
-    imagesAdded: 0,
+    imagesDownloaded: 0,
     stockUpdated: 0,
     errorsCount: 0
   };
@@ -226,7 +226,7 @@ export async function parseSandiJSON(
         stats.productsUpdated += batchResults.updated;
         stats.productsSkipped += batchResults.skipped;
         stats.pricesUpdated += batchResults.pricesUpdated;
-        stats.imagesAdded += batchResults.imagesAdded;
+        stats.imagesDownloaded += batchResults.imagesAdded;
         stats.stockUpdated += batchResults.stockUpdated;
         stats.errorsCount += batchResults.errors;
 
@@ -901,13 +901,10 @@ async function updateImportRecord(
       status,
       categories_created: stats.categoriesCreated,
       categories_updated: stats.categoriesUpdated,
-      brands_created: stats.brandsCreated,
-      brands_updated: stats.brandsUpdated,
       products_created: stats.productsCreated,
       products_updated: stats.productsUpdated,
-      products_skipped: stats.productsSkipped,
       prices_updated: stats.pricesUpdated,
-      images_added: stats.imagesAdded,
+      images_downloaded: stats.imagesDownloaded,
       stock_updated: stats.stockUpdated,
       errors_count: stats.errorsCount,
       completed_at: new Date().toISOString()
@@ -925,7 +922,7 @@ async function logImportAction(
     .from('import_logs')
     .insert({
       import_id: importId,
-      sku: supplierSku,
+      supplier_sku: supplierSku,
       action,
       message
     });
