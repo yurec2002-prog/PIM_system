@@ -199,12 +199,7 @@ export function AttributeSchemaManager() {
 
     const { data, error } = await supabase
       .from('supplier_categories')
-      .select(`
-        *,
-        mapping:supplier_category_mappings(
-          internal_category:internal_categories(id, name)
-        )
-      `)
+      .select('*')
       .eq('supplier_id', selectedSupplier)
       .order('name');
 
@@ -224,6 +219,16 @@ export function AttributeSchemaManager() {
       return;
     }
 
+    const { data: mappings } = await supabase
+      .from('category_mappings')
+      .select(`
+        supplier_category_id,
+        internal_category_id,
+        internal_categories(id, name)
+      `);
+
+    console.log('Mappings loaded:', mappings?.length);
+
     const { data: attrStats } = await supabase
       .from('supplier_category_attribute_presence')
       .select('supplier_category_id, attribute_name, mapped_master_attribute_id')
@@ -239,6 +244,7 @@ export function AttributeSchemaManager() {
     console.log('Product counts:', productCounts?.length);
 
     const categoriesWithStats = data.map(cat => {
+      const mapping = mappings?.find(m => m.supplier_category_id === cat.id);
       const attrs = attrStats?.filter(a => a.supplier_category_id === cat.id) || [];
       const productCount = productCounts?.filter(p => p.supplier_category_id === cat.id).length || 0;
       const total_count = attrs.length;
@@ -246,7 +252,9 @@ export function AttributeSchemaManager() {
 
       return {
         ...cat,
-        mapping: cat.mapping?.[0] || null,
+        mapping: mapping ? {
+          internal_category: mapping.internal_categories
+        } : null,
         attributeStats: {
           total_count,
           mapped_count,
