@@ -189,7 +189,14 @@ export function AttributeSchemaManager() {
   };
 
   const loadSupplierCategories = async () => {
+    if (!selectedSupplier) {
+      setSupplierCategories([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
+
     const { data, error } = await supabase
       .from('supplier_categories')
       .select(`
@@ -201,38 +208,60 @@ export function AttributeSchemaManager() {
       .eq('supplier_id', selectedSupplier)
       .order('name');
 
-    if (!error && data) {
-      const { data: attrStats } = await supabase
-        .from('supplier_category_attribute_presence')
-        .select('supplier_category_id, attribute_name, mapped_master_attribute_id')
-        .eq('supplier_id', selectedSupplier);
+    console.log('Supplier categories query result:', { data, error, selectedSupplier });
 
-      const { data: productCounts } = await supabase
-        .from('products')
-        .select('supplier_category_id')
-        .eq('supplier', 'sandi');
-
-      const categoriesWithStats = data.map(cat => {
-        const attrs = attrStats?.filter(a => a.supplier_category_id === cat.id) || [];
-        const productCount = productCounts?.filter(p => p.supplier_category_id === cat.id).length || 0;
-        const total_count = attrs.length;
-        const mapped_count = attrs.filter(a => a.mapped_master_attribute_id).length;
-
-        return {
-          ...cat,
-          mapping: cat.mapping?.[0] || null,
-          attributeStats: {
-            total_count,
-            mapped_count,
-            unmapped_count: total_count - mapped_count,
-            product_count: productCount
-          }
-        };
-      });
-
-      const tree = buildTree(categoriesWithStats);
-      setSupplierCategories(tree);
+    if (error) {
+      console.error('Error loading supplier categories:', error);
+      setSupplierCategories([]);
+      setLoading(false);
+      return;
     }
+
+    if (!data || data.length === 0) {
+      console.warn('No supplier categories found');
+      setSupplierCategories([]);
+      setLoading(false);
+      return;
+    }
+
+    const { data: attrStats } = await supabase
+      .from('supplier_category_attribute_presence')
+      .select('supplier_category_id, attribute_name, mapped_master_attribute_id')
+      .eq('supplier_id', selectedSupplier);
+
+    console.log('Attribute stats:', attrStats?.length);
+
+    const { data: productCounts } = await supabase
+      .from('products')
+      .select('supplier_category_id')
+      .eq('supplier', 'sandi');
+
+    console.log('Product counts:', productCounts?.length);
+
+    const categoriesWithStats = data.map(cat => {
+      const attrs = attrStats?.filter(a => a.supplier_category_id === cat.id) || [];
+      const productCount = productCounts?.filter(p => p.supplier_category_id === cat.id).length || 0;
+      const total_count = attrs.length;
+      const mapped_count = attrs.filter(a => a.mapped_master_attribute_id).length;
+
+      return {
+        ...cat,
+        mapping: cat.mapping?.[0] || null,
+        attributeStats: {
+          total_count,
+          mapped_count,
+          unmapped_count: total_count - mapped_count,
+          product_count: productCount
+        }
+      };
+    });
+
+    console.log('Categories with stats:', categoriesWithStats.length);
+
+    const tree = buildTree(categoriesWithStats);
+    console.log('Tree built:', tree.length, 'root nodes');
+
+    setSupplierCategories(tree);
     setLoading(false);
   };
 
@@ -377,23 +406,25 @@ export function AttributeSchemaManager() {
               <div className="text-sm font-medium text-gray-900">
                 {category.name_ru || category.name}
               </div>
-              {category.attributeStats.total_count > 0 && (
-                <div className="flex gap-3 text-xs text-gray-500 mt-1">
-                  <span className="flex items-center gap-1">
-                    <Package size={12} />
-                    {category.attributeStats.product_count}
-                  </span>
-                  <span className="flex items-center gap-1 text-blue-600">
-                    <Link2 size={12} />
-                    {category.attributeStats.total_count} attrs
-                  </span>
-                  {category.attributeStats.mapped_count > 0 && (
-                    <span className="text-green-600">
-                      {category.attributeStats.mapped_count} mapped
+              <div className="flex gap-3 text-xs text-gray-500 mt-1">
+                <span className="flex items-center gap-1">
+                  <Package size={12} />
+                  {category.attributeStats.product_count}
+                </span>
+                {category.attributeStats.total_count > 0 && (
+                  <>
+                    <span className="flex items-center gap-1 text-blue-600">
+                      <Link2 size={12} />
+                      {category.attributeStats.total_count} attrs
                     </span>
-                  )}
-                </div>
-              )}
+                    {category.attributeStats.mapped_count > 0 && (
+                      <span className="text-green-600">
+                        {category.attributeStats.mapped_count} mapped
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
 
             {category.mapping && (
@@ -440,12 +471,10 @@ export function AttributeSchemaManager() {
             <div className="flex-1">
               <div className="text-sm font-medium text-gray-900">{category.name}</div>
               <div className="flex gap-3 text-xs text-gray-500 mt-1">
-                {category.attributeStats.total_count > 0 && (
-                  <span className="flex items-center gap-1 text-blue-600">
-                    <Link2 size={12} />
-                    {category.attributeStats.total_count} attrs
-                  </span>
-                )}
+                <span className="flex items-center gap-1 text-blue-600">
+                  <Link2 size={12} />
+                  {category.attributeStats.total_count} attrs
+                </span>
                 {category.attributeStats.required_count > 0 && (
                   <span className="text-orange-600">
                     {category.attributeStats.required_count} required
