@@ -143,7 +143,7 @@ export function ProductsList({ onSelectProduct }: ProductsListProps) {
       .in('id', internalCategoryIds);
 
     const enrichedProducts: EnrichedProduct[] = productsData.map(product => {
-      const productPrices = pricesData?.filter(p => p.product_id === product.id) || [];
+      const productPrices = pricesData?.filter(p => p.supplier_product_id === product.id) || [];
       const brand = brandsData?.find(b => b.external_ref === product.brand_ref);
       const supplierCategory = supplierCategoriesData?.find(c => c.id === product.supplier_category_id);
       const internalCategory = internalCategoriesData?.find(c => c.id === product.internal_category_id);
@@ -579,55 +579,46 @@ export function ProductsList({ onSelectProduct }: ProductsListProps) {
                       </td>
 
                       <td className="px-4 py-3 text-center">
-                        <div className="relative group inline-block">
+                        <div className="inline-block">
                           {product.is_ready ? (
-                            <>
+                            <div className="space-y-1">
                               <div className="inline-flex items-center space-x-1 px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
                                 <CheckCircle className="w-3 h-3" />
                                 <span>Готов</span>
                               </div>
                               {warnings.length > 0 && (
-                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-20">
-                                  <div className="bg-gray-900 text-white text-xs rounded-lg py-2 px-3 whitespace-nowrap">
-                                    <div className="font-medium mb-1 text-yellow-300">⚠ Предупреждения:</div>
-                                    {warnings.map((warning, i) => (
-                                      <div key={i} className="text-gray-200">• {warning}</div>
-                                    ))}
-                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
-                                      <div className="border-4 border-transparent border-t-gray-900"></div>
-                                    </div>
-                                  </div>
+                                <div className="text-xs text-yellow-700 bg-yellow-50 px-2 py-1 rounded">
+                                  ⚠ {warnings.length} предупр.
                                 </div>
                               )}
-                            </>
+                            </div>
                           ) : (
-                            <>
+                            <div className="space-y-1">
                               <div className="inline-flex items-center space-x-1 px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
                                 <XCircle className="w-3 h-3" />
                                 <span>Не готов</span>
                               </div>
                               {blockingReasons.length > 0 && (
-                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-20">
-                                  <div className="bg-gray-900 text-white text-xs rounded-lg py-2 px-3 whitespace-nowrap">
-                                    <div className="font-medium mb-1 text-red-300">🚫 Блокирующие причины:</div>
-                                    {blockingReasons.map((reason, i) => (
-                                      <div key={i} className="text-gray-200">• {reason}</div>
-                                    ))}
-                                    {warnings.length > 0 && (
-                                      <>
-                                        <div className="font-medium mt-2 mb-1 text-yellow-300">⚠ Предупреждения:</div>
-                                        {warnings.map((warning, i) => (
-                                          <div key={i} className="text-gray-200">• {warning}</div>
-                                        ))}
-                                      </>
-                                    )}
-                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
-                                      <div className="border-4 border-transparent border-t-gray-900"></div>
+                                <div className="text-left">
+                                  <div className="text-xs font-semibold text-red-700 mb-0.5">Причины:</div>
+                                  {blockingReasons.slice(0, 3).map((reason, i) => (
+                                    <div key={i} className="text-xs text-red-600 mb-0.5">
+                                      • {reason}
                                     </div>
-                                  </div>
+                                  ))}
+                                  {blockingReasons.length > 3 && (
+                                    <div className="text-xs text-red-500 italic">
+                                      ...и ещё {blockingReasons.length - 3}
+                                    </div>
+                                  )}
                                 </div>
                               )}
-                            </>
+                              {warnings.length > 0 && (
+                                <div className="text-xs text-yellow-700 bg-yellow-50 px-2 py-1 rounded mt-1">
+                                  ⚠ {warnings.length} предупр.
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
                       </td>
