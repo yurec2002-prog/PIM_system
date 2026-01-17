@@ -19,13 +19,18 @@ export function AttributeSchemaWithTabs() {
     unmapped_attributes: 0,
   });
 
-  const { dictionary, inbox } = useAttributeStore();
+  const { dictionary, inbox, loadDictionary, loadInbox } = useAttributeStore();
+
+  useEffect(() => {
+    loadDictionary();
+  }, [loadDictionary]);
 
   useEffect(() => {
     if (selectedSupplier) {
       loadSyncStats();
+      loadInbox(selectedSupplier);
     }
-  }, [selectedSupplier]);
+  }, [selectedSupplier, loadInbox]);
 
   const loadSyncStats = async () => {
     const { count: productsCount } = await supabase
@@ -109,7 +114,7 @@ export function AttributeSchemaWithTabs() {
           >
             <div className="text-xs text-orange-600 mb-1">Unmapped</div>
             <div className="text-lg font-bold text-orange-700">
-              {inbox.filter(i => i.status === 'new').length}
+              {inbox.length}
             </div>
           </div>
         </div>
@@ -152,9 +157,9 @@ export function AttributeSchemaWithTabs() {
               >
                 <InboxIcon className="w-5 h-5" />
                 Inbox
-                {inbox.filter(i => i.status === 'new').length > 0 && (
+                {inbox.length > 0 && (
                   <span className="ml-1 px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
-                    {inbox.filter(i => i.status === 'new').length}
+                    {inbox.length}
                   </span>
                 )}
               </button>
@@ -170,7 +175,7 @@ export function AttributeSchemaWithTabs() {
             />
           )}
           {activeTab === 'dictionary' && <DictionaryTab />}
-          {activeTab === 'inbox' && <InboxTab />}
+          {activeTab === 'inbox' && <InboxTab supplierId={selectedSupplier} />}
         </div>
       </div>
     </div>
