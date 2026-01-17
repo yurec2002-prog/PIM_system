@@ -3,71 +3,79 @@ import { supabase } from '../lib/supabase';
 
 export type AttributeType = 'string' | 'number' | 'boolean' | 'enum' | 'text';
 export type AttributeSource = 'sandi' | 'manual' | 'supplier';
+export type InboxStatus = 'new' | 'linked' | 'created' | 'ignored';
 
-export interface DictionaryAttribute {
+export interface GlobalAttribute {
   id: string;
-  internal_category_id: string;
+  key: string;
+  code: string;
   name: string;
   name_uk?: string;
+  name_en?: string;
   type: string;
-  unit?: string;
-  is_required: boolean;
-  synonyms?: string[];
-  display_order: number;
-  usage_categories: number;
-  usage_products: number;
+  source: AttributeSource;
+  unit_kind?: string;
+  default_unit?: string;
+  needs_review: boolean;
+  usage_count: number;
   created_at: string;
   updated_at: string;
+  aliases?: string[];
 }
 
 export interface InboxItem {
   id: string;
-  attribute_name: string;
-  supplier_category_id: string;
   supplier_id: string;
+  supplier_category_id?: string;
+  raw_name: string;
+  raw_key?: string;
+  normalized_key?: string;
+  frequency: number;
+  examples?: string[];
+  status: InboxStatus;
+  suggested_attribute_id?: string;
+  resolved_attribute_id?: string;
   supplier_name?: string;
   category_name?: string;
-  frequency_count: number;
-  example_values?: string[];
-  mapped_master_attribute_id?: string;
-  mapped_master_attribute?: {
+  suggested_attribute?: {
     id: string;
     name: string;
+    key: string;
     type: string;
-    unit?: string;
   };
 }
 
 interface AttributeStoreState {
-  dictionary: DictionaryAttribute[];
+  dictionary: GlobalAttribute[];
   inbox: InboxItem[];
   loading: boolean;
 
   loadDictionary: () => Promise<void>;
-  loadInbox: (supplierId?: string) => Promise<void>;
-  getDictionaryAttribute: (id: string) => DictionaryAttribute | undefined;
-  searchDictionary: (query: string) => DictionaryAttribute[];
-  updateDictionaryAttribute: (id: string, updates: Partial<DictionaryAttribute>) => Promise<void>;
+  loadInbox: (supplierId?: string, status?: InboxStatus | 'all') => Promise<void>;
+  getDictionaryAttribute: (id: string) => GlobalAttribute | undefined;
+  searchDictionary: (query: string) => GlobalAttribute[];
+  updateDictionaryAttribute: (id: string, updates: Partial<GlobalAttribute>) => Promise<void>;
   createDictionaryAttribute: (attribute: {
-    internal_category_id: string;
     name: string;
     name_uk?: string;
+    name_en?: string;
     type: string;
-    unit?: string;
-    is_required?: boolean;
-    synonyms?: string[];
-  }) => Promise<DictionaryAttribute | null>;
+    source: AttributeSource;
+    unit_kind?: string;
+    default_unit?: string;
+    supplier_id?: string;
+  }) => Promise<GlobalAttribute | null>;
 
   getInboxItem: (id: string) => InboxItem | undefined;
-  linkInboxToAttribute: (inboxId: string, attributeId: string) => Promise<void>;
+  linkInboxToAttribute: (inboxId: string, attributeId: string, createAlias?: boolean) => Promise<void>;
   createAttributeFromInbox: (inboxId: string, attribute: {
-    internal_category_id: string;
     name: string;
     name_uk?: string;
     type: string;
-    unit?: string;
-    synonyms?: string[];
-  }) => Promise<void>;
+    unit_kind?: string;
+    default_unit?: string;
+  }, supplierId: string) => Promise<void>;
+  ignoreInboxItem: (inboxId: string) => Promise<void>;
 }
 
 export const useAttributeStore = create<AttributeStoreState>((set, get) => ({
@@ -91,19 +99,20 @@ export const useAttributeStore = create<AttributeStoreState>((set, get) => ({
 
     const dictionaryWithStats = await Promise.all(
       (attributes || []).map(async (attr) => {
-        const { count: categoriesCount } = await supabase
-          .from('master_attributes')
+        const { count: usageCount } = await supabase
+          .from('category_attributes')
           .select('*', { count: 'exact', head: true })
-          .eq('id', attr.id);
+          .eq('attribute_id', attr.id);
 
-        const { count: productsCount } = await supabase
-          .from('supplier_products')
-          .select('*', { count: 'exact', head: true });
+        const { data: aliases } = await supabase
+          .from('attribute_aliases')
+          .select('alias_text')
+          .eq('attribute_id', attr.id);
 
         return {
           ...attr,
-          usage_categories: categoriesCount || 0,
-          usage_products: productsCount || 0,
+          usage_count: usageCount || 0,
+          aliases: aliases?.map(a => a.alias_text) || [],
         };
       })
     );
@@ -111,27 +120,25 @@ export const useAttributeStore = create<AttributeStoreState>((set, get) => ({
     set({ dictionary: dictionaryWithStats, loading: false });
   },
 
-  loadInbox: async (supplierId?: string) => {
+  loadInbox: async (supplierId?: string, status: InboxStatus | 'all' = 'new') => {
     set({ loading: true });
 
     let query = supabase
-      .from('supplier_category_attribute_presence')
+      .from('attribute_inbox')
       .select(`
-        id,
-        attribute_name,
-        supplier_category_id,
-        supplier_id,
-        frequency_count,
-        example_values,
-        mapped_master_attribute_id,
-        mapped_master_attribute:master_attributes(id, name, type, unit),
-        supplier_category:supplier_categories(id, name, name_ru, supplier:suppliers(name))
+        *,
+        supplier:suppliers(name),
+        supplier_category:supplier_categories(name, name_ru),
+        suggested_attribute:master_attributes!attribute_inbox_suggested_attribute_id_fkey(id, name, key, type)
       `)
-      .is('mapped_master_attribute_id', null)
-      .order('frequency_count', { ascending: false });
+      .order('frequency', { ascending: false });
 
     if (supplierId) {
       query = query.eq('supplier_id', supplierId);
+    }
+
+    if (status !== 'all') {
+      query = query.eq('status', status);
     }
 
     const { data, error } = await query;
@@ -144,15 +151,19 @@ export const useAttributeStore = create<AttributeStoreState>((set, get) => ({
 
     const inbox = (data || []).map((item: any) => ({
       id: item.id,
-      attribute_name: item.attribute_name,
-      supplier_category_id: item.supplier_category_id,
       supplier_id: item.supplier_id,
-      supplier_name: item.supplier_category?.supplier?.name,
+      supplier_category_id: item.supplier_category_id,
+      raw_name: item.raw_name,
+      raw_key: item.raw_key,
+      normalized_key: item.normalized_key,
+      frequency: item.frequency,
+      examples: item.examples,
+      status: item.status,
+      suggested_attribute_id: item.suggested_attribute_id,
+      resolved_attribute_id: item.resolved_attribute_id,
+      supplier_name: item.supplier?.name,
       category_name: item.supplier_category?.name_ru || item.supplier_category?.name,
-      frequency_count: item.frequency_count,
-      example_values: item.example_values,
-      mapped_master_attribute_id: item.mapped_master_attribute_id,
-      mapped_master_attribute: item.mapped_master_attribute,
+      suggested_attribute: item.suggested_attribute,
     }));
 
     set({ inbox, loading: false });
@@ -167,15 +178,22 @@ export const useAttributeStore = create<AttributeStoreState>((set, get) => ({
     return get().dictionary.filter(attr =>
       attr.name.toLowerCase().includes(lowerQuery) ||
       attr.name_uk?.toLowerCase().includes(lowerQuery) ||
-      (attr.synonyms || []).some(s => s.toLowerCase().includes(lowerQuery))
+      attr.key.toLowerCase().includes(lowerQuery) ||
+      attr.code.toLowerCase().includes(lowerQuery) ||
+      (attr.aliases || []).some(a => a.toLowerCase().includes(lowerQuery))
     );
   },
 
-  updateDictionaryAttribute: async (id: string, updates: Partial<DictionaryAttribute>) => {
+  updateDictionaryAttribute: async (id: string, updates: Partial<GlobalAttribute>) => {
     const { error } = await supabase
       .from('master_attributes')
       .update({
-        ...updates,
+        name: updates.name,
+        name_uk: updates.name_uk,
+        name_en: updates.name_en,
+        unit_kind: updates.unit_kind,
+        default_unit: updates.default_unit,
+        needs_review: updates.needs_review,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id);
@@ -195,17 +213,30 @@ export const useAttributeStore = create<AttributeStoreState>((set, get) => ({
   },
 
   createDictionaryAttribute: async (attribute) => {
+    const key = await supabase.rpc('generate_attribute_key', {
+      p_source: attribute.source,
+      p_name: attribute.name,
+      p_supplier_id: attribute.supplier_id || null,
+    });
+
+    if (!key.data) {
+      console.error('Failed to generate attribute key');
+      return null;
+    }
+
     const { data, error } = await supabase
       .from('master_attributes')
       .insert({
-        internal_category_id: attribute.internal_category_id,
+        key: key.data,
+        code: attribute.name.toUpperCase().replace(/[^A-ZА-ЯЁ0-9]+/g, '_'),
         name: attribute.name,
         name_uk: attribute.name_uk,
+        name_en: attribute.name_en,
         type: attribute.type,
-        unit: attribute.unit,
-        is_required: attribute.is_required || false,
-        synonyms: attribute.synonyms || [],
-        display_order: 999,
+        source: attribute.source,
+        unit_kind: attribute.unit_kind,
+        default_unit: attribute.default_unit,
+        needs_review: true,
       })
       .select()
       .single();
@@ -215,10 +246,10 @@ export const useAttributeStore = create<AttributeStoreState>((set, get) => ({
       return null;
     }
 
-    const newAttr: DictionaryAttribute = {
+    const newAttr: GlobalAttribute = {
       ...data,
-      usage_categories: 0,
-      usage_products: 0,
+      usage_count: 0,
+      aliases: [],
     };
 
     set(state => ({
@@ -232,11 +263,14 @@ export const useAttributeStore = create<AttributeStoreState>((set, get) => ({
     return get().inbox.find(item => item.id === id);
   },
 
-  linkInboxToAttribute: async (inboxId: string, attributeId: string) => {
+  linkInboxToAttribute: async (inboxId: string, attributeId: string, createAlias: boolean = true) => {
+    const inboxItem = get().getInboxItem(inboxId);
+
     const { error } = await supabase
-      .from('supplier_category_attribute_presence')
+      .from('attribute_inbox')
       .update({
-        mapped_master_attribute_id: attributeId,
+        resolved_attribute_id: attributeId,
+        status: 'linked',
         updated_at: new Date().toISOString(),
       })
       .eq('id', inboxId);
@@ -246,16 +280,47 @@ export const useAttributeStore = create<AttributeStoreState>((set, get) => ({
       return;
     }
 
+    if (createAlias && inboxItem) {
+      await supabase
+        .from('attribute_aliases')
+        .insert({
+          attribute_id: attributeId,
+          alias_text: inboxItem.raw_name,
+          supplier_id: inboxItem.supplier_id,
+        });
+    }
+
+    await get().loadInbox();
+  },
+
+  createAttributeFromInbox: async (inboxId, attribute, supplierId) => {
+    const newAttr = await get().createDictionaryAttribute({
+      ...attribute,
+      source: 'supplier',
+      supplier_id: supplierId,
+    });
+
+    if (newAttr) {
+      await get().linkInboxToAttribute(inboxId, newAttr.id, true);
+    }
+  },
+
+  ignoreInboxItem: async (inboxId: string) => {
+    const { error } = await supabase
+      .from('attribute_inbox')
+      .update({
+        status: 'ignored',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', inboxId);
+
+    if (error) {
+      console.error('Error ignoring inbox item:', error);
+      return;
+    }
+
     set(state => ({
       inbox: state.inbox.filter(item => item.id !== inboxId),
     }));
-  },
-
-  createAttributeFromInbox: async (inboxId, attribute) => {
-    const newAttr = await get().createDictionaryAttribute(attribute);
-
-    if (newAttr) {
-      await get().linkInboxToAttribute(inboxId, newAttr.id);
-    }
   },
 }));

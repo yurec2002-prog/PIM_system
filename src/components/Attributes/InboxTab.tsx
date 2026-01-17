@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import {
   useAttributeStore,
   InboxItem,
+  InboxStatus,
 } from '../../stores/attributeStore';
-import { Inbox, Link2, Plus, Search, CheckCircle, AlertCircle, X, Loader } from 'lucide-react';
+import { Inbox, Link2, Plus, Search, CheckCircle, AlertCircle, X, Loader, XCircle, Filter } from 'lucide-react';
 
 interface InboxTabProps {
   supplierId?: string;
@@ -15,19 +16,24 @@ export function InboxTab({ supplierId }: InboxTabProps) {
     dictionary,
     loading,
     loadInbox,
+    loadDictionary,
     searchDictionary,
     linkInboxToAttribute,
     createAttributeFromInbox,
-    getDictionaryAttribute,
+    ignoreInboxItem,
   } = useAttributeStore();
 
   const [selectedItem, setSelectedItem] = useState<InboxItem | null>(null);
   const [actionMode, setActionMode] = useState<'link' | 'create' | null>(null);
-  const [internalCategoryId, setInternalCategoryId] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<InboxStatus | 'all'>('new');
 
   useEffect(() => {
-    loadInbox(supplierId);
-  }, [supplierId, loadInbox]);
+    loadDictionary();
+  }, [loadDictionary]);
+
+  useEffect(() => {
+    loadInbox(supplierId, statusFilter);
+  }, [supplierId, statusFilter, loadInbox]);
 
   const handleLink = (item: InboxItem) => {
     setSelectedItem(item);
@@ -37,6 +43,13 @@ export function InboxTab({ supplierId }: InboxTabProps) {
   const handleCreate = (item: InboxItem) => {
     setSelectedItem(item);
     setActionMode('create');
+  };
+
+  const handleIgnore = async (item: InboxItem) => {
+    if (confirm(`Игнорировать атрибут "${item.raw_name}"?`)) {
+      await ignoreInboxItem(item.id);
+      await loadInbox(supplierId, statusFilter);
+    }
   };
 
   const closeDialog = () => {
@@ -61,15 +74,30 @@ export function InboxTab({ supplierId }: InboxTabProps) {
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
             <Inbox className="w-6 h-6 text-orange-600" />
-            <h2 className="text-xl font-bold text-gray-900">Неопознанные атрибуты</h2>
+            <h2 className="text-xl font-bold text-gray-900">Inbox: Неопознанные атрибуты</h2>
           </div>
           <p className="text-sm text-gray-600">
-            Атрибуты от поставщиков, которые еще не связаны с мастер-атрибутами
+            Атрибуты из импорта, которые нужно связать (Link) или создать (Create) в глобальном справочнике
           </p>
         </div>
 
+        <div className="flex items-center gap-3 mb-4">
+          <Filter className="w-4 h-4 text-gray-500" />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as InboxStatus | 'all')}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">Все статусы</option>
+            <option value="new">New (новые)</option>
+            <option value="linked">Linked (связаны)</option>
+            <option value="created">Created (созданы)</option>
+            <option value="ignored">Ignored (игнорированы)</option>
+          </select>
+        </div>
+
         <div className="text-sm text-gray-600">
-          Найдено: {inbox.length} неопознанных атрибутов
+          Найдено: {inbox.length} атрибутов
         </div>
       </div>
 
@@ -79,7 +107,7 @@ export function InboxTab({ supplierId }: InboxTabProps) {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Название атрибута
+                  Raw Name
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Поставщик
@@ -88,10 +116,13 @@ export function InboxTab({ supplierId }: InboxTabProps) {
                   Категория
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Частота
+                  Frequency
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Примеры значений
+                  Examples
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Действия
@@ -102,39 +133,66 @@ export function InboxTab({ supplierId }: InboxTabProps) {
               {inbox.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3">
-                    <div className="text-sm font-medium text-gray-900">{item.attribute_name}</div>
+                    <div className="text-sm font-medium text-gray-900">{item.raw_name}</div>
+                    {item.suggested_attribute && (
+                      <div className="text-xs text-blue-600 mt-1">
+                        Предложение: {item.suggested_attribute.name}
+                      </div>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{item.supplier_name || 'N/A'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{item.category_name || 'N/A'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">{item.supplier_name || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">{item.category_name || '-'}</td>
                   <td className="px-4 py-3">
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
-                      {item.frequency_count}
+                      {item.frequency}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
-                    {item.example_values && item.example_values.length > 0
-                      ? item.example_values.slice(0, 2).join(', ')
+                    {item.examples && item.examples.length > 0
+                      ? item.examples.slice(0, 2).join(', ')
                       : '-'}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleLink(item)}
-                        className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
-                        title="Связать с существующим атрибутом"
-                      >
-                        <Link2 className="w-3 h-3" />
-                        Связать
-                      </button>
-                      <button
-                        onClick={() => handleCreate(item)}
-                        className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs"
-                        title="Создать новый атрибут"
-                      >
-                        <Plus className="w-3 h-3" />
-                        Создать
-                      </button>
-                    </div>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                      item.status === 'new' ? 'bg-orange-100 text-orange-800' :
+                      item.status === 'linked' ? 'bg-blue-100 text-blue-800' :
+                      item.status === 'created' ? 'bg-green-100 text-green-800' :
+                      'bg-gray-100 text-gray-600'
+                    }`}>
+                      {item.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {item.status === 'new' ? (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleLink(item)}
+                          className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
+                          title="Связать с существующим атрибутом"
+                        >
+                          <Link2 className="w-3 h-3" />
+                          Link
+                        </button>
+                        <button
+                          onClick={() => handleCreate(item)}
+                          className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs"
+                          title="Создать новый глобальный атрибут"
+                        >
+                          <Plus className="w-3 h-3" />
+                          Create
+                        </button>
+                        <button
+                          onClick={() => handleIgnore(item)}
+                          className="flex items-center gap-1 px-2 py-1 bg-gray-400 text-white rounded hover:bg-gray-500 text-xs"
+                          title="Игнорировать"
+                        >
+                          <XCircle className="w-3 h-3" />
+                          Ignore
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-500">Обработан</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -144,7 +202,11 @@ export function InboxTab({ supplierId }: InboxTabProps) {
           {inbox.length === 0 && (
             <div className="text-center py-12 text-gray-500">
               <Inbox className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>Все атрибуты обработаны</p>
+              <p>
+                {statusFilter === 'new'
+                  ? 'Все новые атрибуты обработаны'
+                  : 'Атрибуты не найдены'}
+              </p>
             </div>
           )}
         </div>
@@ -155,9 +217,9 @@ export function InboxTab({ supplierId }: InboxTabProps) {
           item={selectedItem}
           dictionary={dictionary}
           searchDictionary={searchDictionary}
-          onLink={async (attrId) => {
-            await linkInboxToAttribute(selectedItem.id, attrId);
-            await loadInbox(supplierId);
+          onLink={async (attrId, createAlias) => {
+            await linkInboxToAttribute(selectedItem.id, attrId, createAlias);
+            await loadInbox(supplierId, statusFilter);
             closeDialog();
           }}
           onClose={closeDialog}
@@ -168,8 +230,8 @@ export function InboxTab({ supplierId }: InboxTabProps) {
         <CreateAttributeDialog
           item={selectedItem}
           onCreate={async (attribute) => {
-            await createAttributeFromInbox(selectedItem.id, attribute);
-            await loadInbox(supplierId);
+            await createAttributeFromInbox(selectedItem.id, attribute, selectedItem.supplier_id);
+            await loadInbox(supplierId, statusFilter);
             closeDialog();
           }}
           onClose={closeDialog}
@@ -183,7 +245,7 @@ interface LinkAttributeDialogProps {
   item: InboxItem;
   dictionary: any[];
   searchDictionary: (query: string) => any[];
-  onLink: (attributeId: string) => void;
+  onLink: (attributeId: string, createAlias: boolean) => void;
   onClose: () => void;
 }
 
@@ -194,19 +256,22 @@ function LinkAttributeDialog({
   onLink,
   onClose,
 }: LinkAttributeDialogProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedAttrId, setSelectedAttrId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState(item.raw_name);
+  const [selectedAttrId, setSelectedAttrId] = useState<string | null>(
+    item.suggested_attribute_id || null
+  );
+  const [createAlias, setCreateAlias] = useState(true);
 
   const results = searchQuery ? searchDictionary(searchQuery) : dictionary.slice(0, 20);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-auto">
+      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-auto">
         <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
           <div>
-            <h3 className="text-xl font-bold text-gray-900">Связать с существующим атрибутом</h3>
+            <h3 className="text-xl font-bold text-gray-900">Link: Связать с существующим атрибутом</h3>
             <p className="text-sm text-gray-600 mt-1">
-              Связываем: <span className="font-medium">{item.attribute_name}</span>
+              Raw name: <span className="font-medium text-orange-700">{item.raw_name}</span>
             </p>
           </div>
           <button
@@ -224,7 +289,7 @@ function LinkAttributeDialog({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Поиск по названию атрибута..."
+              placeholder="Поиск в глобальном справочнике..."
               className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
               autoFocus
             />
@@ -248,13 +313,25 @@ function LinkAttributeDialog({
                       <div className="text-sm text-gray-500 mt-0.5">{attr.name_uk}</div>
                     )}
                     <div className="flex items-center gap-2 mt-2">
+                      <code className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-700">
+                        {attr.key}
+                      </code>
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
                         {attr.type}
                       </span>
-                      {attr.unit && (
-                        <span className="text-xs text-gray-600">({attr.unit})</span>
-                      )}
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        attr.source === 'sandi' ? 'bg-purple-100 text-purple-800' :
+                        attr.source === 'manual' ? 'bg-green-100 text-green-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {attr.source}
+                      </span>
                     </div>
+                    {attr.aliases && attr.aliases.length > 0 && (
+                      <div className="text-xs text-gray-500 mt-2">
+                        Aliases: {attr.aliases.slice(0, 3).join(', ')}
+                      </div>
+                    )}
                   </div>
                   {selectedAttrId === attr.id && (
                     <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
@@ -269,9 +346,23 @@ function LinkAttributeDialog({
             )}
           </div>
 
+          <div className="border-t border-gray-200 pt-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={createAlias}
+                onChange={(e) => setCreateAlias(e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-700">
+                Создать alias (добавить "{item.raw_name}" как синоним выбранного атрибута)
+              </span>
+            </label>
+          </div>
+
           <div className="flex gap-3 pt-4 border-t border-gray-200">
             <button
-              onClick={() => selectedAttrId && onLink(selectedAttrId)}
+              onClick={() => selectedAttrId && onLink(selectedAttrId, createAlias)}
               disabled={!selectedAttrId}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -293,36 +384,34 @@ function LinkAttributeDialog({
 interface CreateAttributeDialogProps {
   item: InboxItem;
   onCreate: (attribute: {
-    internal_category_id: string;
     name: string;
     name_uk?: string;
     type: string;
-    unit?: string;
-    synonyms?: string[];
+    unit_kind?: string;
+    default_unit?: string;
   }) => void;
   onClose: () => void;
 }
 
 function CreateAttributeDialog({ item, onCreate, onClose }: CreateAttributeDialogProps) {
-  const [name, setName] = useState(item.attribute_name);
+  const [name, setName] = useState(item.raw_name);
   const [nameUk, setNameUk] = useState('');
   const [type, setType] = useState('text');
-  const [unit, setUnit] = useState('');
-  const [internalCategoryId, setInternalCategoryId] = useState('');
+  const [unitKind, setUnitKind] = useState('');
+  const [defaultUnit, setDefaultUnit] = useState('');
 
   const handleCreate = () => {
-    if (!name || !internalCategoryId) {
-      alert('Название и категория обязательны');
+    if (!name) {
+      alert('Название обязательно');
       return;
     }
 
     onCreate({
-      internal_category_id: internalCategoryId,
       name,
       name_uk: nameUk || undefined,
       type,
-      unit: unit || undefined,
-      synonyms: [item.attribute_name],
+      unit_kind: unitKind || undefined,
+      default_unit: defaultUnit || undefined,
     });
   };
 
@@ -331,9 +420,9 @@ function CreateAttributeDialog({ item, onCreate, onClose }: CreateAttributeDialo
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-auto">
         <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
           <div>
-            <h3 className="text-xl font-bold text-gray-900">Создать новый атрибут</h3>
+            <h3 className="text-xl font-bold text-gray-900">Create: Создать новый глобальный атрибут</h3>
             <p className="text-sm text-gray-600 mt-1">
-              Из: <span className="font-medium">{item.attribute_name}</span>
+              Из raw: <span className="font-medium text-orange-700">{item.raw_name}</span>
             </p>
           </div>
           <button
@@ -383,38 +472,40 @@ function CreateAttributeDialog({ item, onCreate, onClose }: CreateAttributeDialo
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Единица (необязательно)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Unit Kind (необязательно)</label>
               <input
                 type="text"
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
+                value={unitKind}
+                onChange={(e) => setUnitKind(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                placeholder="например: кг, мм, Вт"
+                placeholder="weight, length, power..."
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              ID внутренней категории <span className="text-red-500">*</span>
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Default Unit (необязательно)</label>
             <input
               type="text"
-              value={internalCategoryId}
-              onChange={(e) => setInternalCategoryId(e.target.value)}
+              value={defaultUnit}
+              onChange={(e) => setDefaultUnit(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-              placeholder="UUID категории"
+              placeholder="например: кг, мм, Вт"
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Атрибут будет создан в указанной категории
-            </p>
           </div>
 
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
             <div className="flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-orange-800">
-                Новый атрибут будет добавлен в справочник и автоматически связан с этим атрибутом поставщика.
+              <AlertCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-green-800">
+                <div className="font-medium mb-1">Что будет создано:</div>
+                <ul className="list-disc list-inside space-y-1 text-xs">
+                  <li>Новый атрибут в глобальном справочнике (master_attributes)</li>
+                  <li>Key будет сгенерирован автоматически: supplier:{'{supplier_id}'}:{'{normalized_name}'}</li>
+                  <li>Source = supplier, needs_review = true</li>
+                  <li>Alias "{item.raw_name}" будет добавлен автоматически</li>
+                  <li>Inbox item будет помечен как "created" и связан с новым атрибутом</li>
+                </ul>
               </div>
             </div>
           </div>
@@ -424,7 +515,7 @@ function CreateAttributeDialog({ item, onCreate, onClose }: CreateAttributeDialo
               onClick={handleCreate}
               className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
             >
-              Создать атрибут
+              Создать глобальный атрибут
             </button>
             <button
               onClick={onClose}

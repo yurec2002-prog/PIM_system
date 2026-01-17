@@ -43,23 +43,23 @@ export function AttributeSchemaWithTabs() {
       .select('*', { count: 'exact', head: true })
       .eq('supplier_id', selectedSupplier);
 
-    const { count: presenceCount } = await supabase
-      .from('supplier_category_attribute_presence')
+    const { count: inboxCount } = await supabase
+      .from('attribute_inbox')
       .select('*', { count: 'exact', head: true })
       .eq('supplier_id', selectedSupplier);
 
-    const { count: mappedCount } = await supabase
-      .from('supplier_category_attribute_presence')
+    const { count: unmappedCount } = await supabase
+      .from('attribute_inbox')
       .select('*', { count: 'exact', head: true })
       .eq('supplier_id', selectedSupplier)
-      .not('mapped_master_attribute_id', 'is', null);
+      .eq('status', 'new');
 
     const stats = {
       total_products: productsCount || 0,
-      total_attributes: presenceCount || 0,
+      total_attributes: inboxCount || 0,
       total_categories: categoriesCount || 0,
-      mapped_attributes: mappedCount || 0,
-      unmapped_attributes: (presenceCount || 0) - (mappedCount || 0),
+      mapped_attributes: (inboxCount || 0) - (unmappedCount || 0),
+      unmapped_attributes: unmappedCount || 0,
     };
 
     setSyncStats(stats);
