@@ -86,7 +86,12 @@ interface Supplier {
   name: string;
 }
 
-export function AttributeSchemaManager() {
+interface AttributeSchemaManagerProps {
+  onSupplierChange?: (supplierId: string) => void;
+  onStatsChange?: (stats: any) => void;
+}
+
+export function AttributeSchemaManager({ onSupplierChange, onStatsChange }: AttributeSchemaManagerProps = {}) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selectedSupplier, setSelectedSupplier] = useState<string>('');
   const [supplierCategories, setSupplierCategories] = useState<SupplierCategory[]>([]);
@@ -116,6 +121,12 @@ export function AttributeSchemaManager() {
   useEffect(() => {
     loadSyncStats();
   }, [selectedSupplier]);
+
+  useEffect(() => {
+    if (onSupplierChange) {
+      onSupplierChange(selectedSupplier);
+    }
+  }, [selectedSupplier, onSupplierChange]);
 
   useEffect(() => {
     if (selectedSupplier) {
@@ -201,6 +212,9 @@ export function AttributeSchemaManager() {
 
     console.log('Setting sync stats:', stats);
     setSyncStats(stats);
+    if (onStatsChange) {
+      onStatsChange(stats);
+    }
   };
 
   const loadSupplierCategories = async () => {
@@ -751,60 +765,24 @@ export function AttributeSchemaManager() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-full mx-auto p-6">
+    <div className="bg-gray-50 pt-6">
+      <div className="max-w-full mx-auto px-6">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Attribute Schema Manager</h1>
-          <p className="text-gray-600">
-            Manage attribute mappings between supplier categories and internal master categories
-          </p>
-        </div>
-
-        <div className="mb-6 grid grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Supplier
-            </label>
-            <select
-              value={selectedSupplier}
-              onChange={(e) => setSelectedSupplier(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Select Supplier</option>
-              {suppliers.map((supplier) => (
-                <option key={supplier.id} value={supplier.id}>
-                  {supplier.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="col-span-2">
-            {syncStats && (
-              <div className="grid grid-cols-5 gap-3">
-                <div className="bg-white rounded-lg border border-gray-200 p-3">
-                  <div className="text-xs text-gray-500 mb-1">Products</div>
-                  <div className="text-lg font-bold text-gray-900">{syncStats.total_products}</div>
-                </div>
-                <div className="bg-white rounded-lg border border-gray-200 p-3">
-                  <div className="text-xs text-gray-500 mb-1">Categories</div>
-                  <div className="text-lg font-bold text-gray-900">{syncStats.total_categories}</div>
-                </div>
-                <div className="bg-white rounded-lg border border-gray-200 p-3">
-                  <div className="text-xs text-gray-500 mb-1">Attributes</div>
-                  <div className="text-lg font-bold text-gray-900">{syncStats.total_attributes}</div>
-                </div>
-                <div className="bg-white rounded-lg border border-green-200 p-3">
-                  <div className="text-xs text-green-600 mb-1">Mapped</div>
-                  <div className="text-lg font-bold text-green-700">{syncStats.mapped_attributes}</div>
-                </div>
-                <div className="bg-white rounded-lg border border-orange-200 p-3">
-                  <div className="text-xs text-orange-600 mb-1">Unmapped</div>
-                  <div className="text-lg font-bold text-orange-700">{syncStats.unmapped_attributes}</div>
-                </div>
-              </div>
-            )}
-          </div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Supplier
+          </label>
+          <select
+            value={selectedSupplier}
+            onChange={(e) => setSelectedSupplier(e.target.value)}
+            className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Select Supplier</option>
+            {suppliers.map((supplier) => (
+              <option key={supplier.id} value={supplier.id}>
+                {supplier.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         {!selectedSupplier ? (
