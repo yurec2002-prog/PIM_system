@@ -20,7 +20,7 @@ export interface GlobalAttribute {
   usage_count: number;
   created_at: string;
   updated_at: string;
-  aliases?: string[];
+  aliases?: Array<{ id: string; text: string }>;
 }
 
 export interface InboxItem {
@@ -34,6 +34,7 @@ export interface InboxItem {
   examples?: string[];
   status: InboxStatus;
   suggested_attribute_id?: string;
+  suggested_confidence?: number;
   resolved_attribute_id?: string;
   supplier_name?: string;
   category_name?: string;
@@ -68,6 +69,8 @@ interface AttributeStoreState {
 
   getInboxItem: (id: string) => InboxItem | undefined;
   linkInboxToAttribute: (inboxId: string, attributeId: string, createAlias?: boolean) => Promise<void>;
+  linkSuggestedAttribute: (inboxId: string) => Promise<void>;
+  batchLinkSuggested: (inboxIds: string[]) => Promise<{ success: number; failed: number }>;
   createAttributeFromInbox: (inboxId: string, attribute: {
     name: string;
     name_uk?: string;
@@ -76,6 +79,10 @@ interface AttributeStoreState {
     default_unit?: string;
   }, supplierId: string) => Promise<void>;
   ignoreInboxItem: (inboxId: string) => Promise<void>;
+
+  addAlias: (attributeId: string, aliasText: string, supplierId?: string) => Promise<void>;
+  removeAlias: (aliasId: string) => Promise<void>;
+  refreshSuggestions: () => Promise<void>;
 }
 
 export const useAttributeStore = create<AttributeStoreState>((set, get) => ({
@@ -106,13 +113,13 @@ export const useAttributeStore = create<AttributeStoreState>((set, get) => ({
 
         const { data: aliases } = await supabase
           .from('attribute_aliases')
-          .select('alias_text')
+          .select('id, alias_text')
           .eq('attribute_id', attr.id);
 
         return {
           ...attr,
           usage_count: usageCount || 0,
-          aliases: aliases?.map(a => a.alias_text) || [],
+          aliases: aliases?.map(a => ({ id: a.id, text: a.alias_text })) || [],
         };
       })
     );
@@ -160,6 +167,7 @@ export const useAttributeStore = create<AttributeStoreState>((set, get) => ({
       examples: item.examples,
       status: item.status,
       suggested_attribute_id: item.suggested_attribute_id,
+      suggested_confidence: item.suggested_confidence,
       resolved_attribute_id: item.resolved_attribute_id,
       supplier_name: item.supplier?.name,
       category_name: item.supplier_category?.name_ru || item.supplier_category?.name,
@@ -180,7 +188,7 @@ export const useAttributeStore = create<AttributeStoreState>((set, get) => ({
       attr.name_uk?.toLowerCase().includes(lowerQuery) ||
       attr.key.toLowerCase().includes(lowerQuery) ||
       attr.code.toLowerCase().includes(lowerQuery) ||
-      (attr.aliases || []).some(a => a.toLowerCase().includes(lowerQuery))
+      (attr.aliases || []).some(a => a.text.toLowerCase().includes(lowerQuery))
     );
   },
 
@@ -322,5 +330,76 @@ export const useAttributeStore = create<AttributeStoreState>((set, get) => ({
     set(state => ({
       inbox: state.inbox.filter(item => item.id !== inboxId),
     }));
+  },
+
+  linkSuggestedAttribute: async (inboxId: string) => {
+    const inboxItem = get().getInboxItem(inboxId);
+    if (!inboxItem || !inboxItem.suggested_attribute_id) {
+      console.error('No suggested attribute for this item');
+      return;
+    }
+
+    await get().linkInboxToAttribute(inboxId, inboxItem.suggested_attribute_id, true);
+  },
+
+  batchLinkSuggested: async (inboxIds: string[]) => {
+    const { data, error } = await supabase.rpc('batch_link_suggested', {
+      p_inbox_ids: inboxIds,
+    });
+
+    if (error) {
+      console.error('Error batch linking:', error);
+      return { success: 0, failed: inboxIds.length };
+    }
+
+    const results = data as { inbox_id: string; success: boolean; error_message: string }[];
+    const successCount = results.filter(r => r.success).length;
+    const failedCount = results.filter(r => !r.success).length;
+
+    await get().loadInbox();
+
+    return { success: successCount, failed: failedCount };
+  },
+
+  addAlias: async (attributeId: string, aliasText: string, supplierId?: string) => {
+    const { error } = await supabase
+      .from('attribute_aliases')
+      .insert({
+        attribute_id: attributeId,
+        alias_text: aliasText,
+        supplier_id: supplierId || null,
+      });
+
+    if (error) {
+      console.error('Error adding alias:', error);
+      throw error;
+    }
+
+    await get().loadDictionary();
+  },
+
+  removeAlias: async (aliasId: string) => {
+    const { error } = await supabase
+      .from('attribute_aliases')
+      .delete()
+      .eq('id', aliasId);
+
+    if (error) {
+      console.error('Error removing alias:', error);
+      throw error;
+    }
+
+    await get().loadDictionary();
+  },
+
+  refreshSuggestions: async () => {
+    const { error } = await supabase.rpc('update_inbox_suggestions');
+
+    if (error) {
+      console.error('Error refreshing suggestions:', error);
+      return;
+    }
+
+    await get().loadInbox();
   },
 }));

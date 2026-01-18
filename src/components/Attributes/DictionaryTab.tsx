@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAttributeStore, GlobalAttribute, AttributeSource } from '../../stores/attributeStore';
-import { Search, X, Package, Eye, Loader, Tag, AlertCircle } from 'lucide-react';
+import { Search, X, Package, Eye, Loader, Tag, AlertCircle, Plus, Trash2 } from 'lucide-react';
 
 interface DictionaryTabProps {
   initialSearch?: string;
@@ -253,12 +253,15 @@ interface AttributeDetailsModalProps {
 }
 
 function AttributeDetailsModal({ attribute, onClose, onUpdate }: AttributeDetailsModalProps) {
+  const { addAlias, removeAlias } = useAttributeStore();
   const [editedName, setEditedName] = useState(attribute.name);
   const [editedNameUk, setEditedNameUk] = useState(attribute.name_uk || '');
   const [editedNameEn, setEditedNameEn] = useState(attribute.name_en || '');
   const [editedUnitKind, setEditedUnitKind] = useState(attribute.unit_kind || '');
   const [editedDefaultUnit, setEditedDefaultUnit] = useState(attribute.default_unit || '');
   const [editedNeedsReview, setEditedNeedsReview] = useState(attribute.needs_review);
+  const [newAlias, setNewAlias] = useState('');
+  const [addingAlias, setAddingAlias] = useState(false);
 
   const handleSave = () => {
     onUpdate({
@@ -269,6 +272,30 @@ function AttributeDetailsModal({ attribute, onClose, onUpdate }: AttributeDetail
       default_unit: editedDefaultUnit || undefined,
       needs_review: editedNeedsReview,
     });
+  };
+
+  const handleAddAlias = async () => {
+    if (!newAlias.trim()) return;
+
+    setAddingAlias(true);
+    try {
+      await addAlias(attribute.id, newAlias.trim());
+      setNewAlias('');
+    } catch (error) {
+      alert('Ошибка добавления alias. Возможно, такой alias уже существует.');
+    } finally {
+      setAddingAlias(false);
+    }
+  };
+
+  const handleRemoveAlias = async (aliasId: string) => {
+    if (!confirm('Удалить этот alias?')) return;
+
+    try {
+      await removeAlias(aliasId);
+    } catch (error) {
+      alert('Ошибка удаления alias');
+    }
   };
 
   return (
@@ -377,21 +404,53 @@ function AttributeDetailsModal({ attribute, onClose, onUpdate }: AttributeDetail
             </div>
           </div>
 
-          {attribute.aliases && attribute.aliases.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Aliases (синонимы)</label>
-              <div className="px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-900 border border-gray-200">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Aliases (синонимы)</label>
+
+            <div className="mb-3 flex gap-2">
+              <input
+                type="text"
+                value={newAlias}
+                onChange={(e) => setNewAlias(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddAlias()}
+                placeholder="Добавить алиас..."
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                disabled={addingAlias}
+              />
+              <button
+                onClick={handleAddAlias}
+                disabled={!newAlias.trim() || addingAlias}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Добавить
+              </button>
+            </div>
+
+            {attribute.aliases && attribute.aliases.length > 0 ? (
+              <div className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
                 <div className="flex flex-wrap gap-2">
-                  {attribute.aliases.map((alias, idx) => (
-                    <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                  {attribute.aliases.map((alias) => (
+                    <span key={alias.id} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs group">
                       <Tag className="w-3 h-3" />
-                      {alias}
+                      {alias.text}
+                      <button
+                        onClick={() => handleRemoveAlias(alias.id)}
+                        className="ml-1 text-blue-600 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Удалить alias"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
                     </span>
                   ))}
                 </div>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-500 text-center">
+                Нет aliases
+              </div>
+            )}
+          </div>
 
           <div>
             <label className="flex items-center gap-2 cursor-pointer">

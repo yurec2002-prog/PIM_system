@@ -4,7 +4,7 @@ import {
   InboxItem,
   InboxStatus,
 } from '../../stores/attributeStore';
-import { Inbox, Link2, Plus, Search, CheckCircle, AlertCircle, X, Loader, XCircle, Filter } from 'lucide-react';
+import { Inbox, Link2, Plus, Search, CheckCircle, AlertCircle, X, Loader, XCircle, Filter, Zap, RefreshCw } from 'lucide-react';
 
 interface InboxTabProps {
   supplierId?: string;
@@ -19,13 +19,19 @@ export function InboxTab({ supplierId }: InboxTabProps) {
     loadDictionary,
     searchDictionary,
     linkInboxToAttribute,
+    linkSuggestedAttribute,
+    batchLinkSuggested,
     createAttributeFromInbox,
     ignoreInboxItem,
+    refreshSuggestions,
   } = useAttributeStore();
 
   const [selectedItem, setSelectedItem] = useState<InboxItem | null>(null);
   const [actionMode, setActionMode] = useState<'link' | 'create' | null>(null);
   const [statusFilter, setStatusFilter] = useState<InboxStatus | 'all'>('new');
+  const [showOnlyWithSuggestions, setShowOnlyWithSuggestions] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchProcessing, setBatchProcessing] = useState(false);
 
   useEffect(() => {
     loadDictionary();
@@ -35,9 +41,20 @@ export function InboxTab({ supplierId }: InboxTabProps) {
     loadInbox(supplierId, statusFilter);
   }, [supplierId, statusFilter, loadInbox]);
 
+  const filteredInbox = showOnlyWithSuggestions
+    ? inbox.filter(item => item.suggested_attribute_id)
+    : inbox;
+
   const handleLink = (item: InboxItem) => {
     setSelectedItem(item);
     setActionMode('link');
+  };
+
+  const handleLinkSuggested = async (item: InboxItem) => {
+    if (!item.suggested_attribute_id) return;
+
+    await linkSuggestedAttribute(item.id);
+    await loadInbox(supplierId, statusFilter);
   };
 
   const handleCreate = (item: InboxItem) => {
@@ -50,6 +67,47 @@ export function InboxTab({ supplierId }: InboxTabProps) {
       await ignoreInboxItem(item.id);
       await loadInbox(supplierId, statusFilter);
     }
+  };
+
+  const handleSelectItem = (id: string, checked: boolean) => {
+    const newSelected = new Set(selectedIds);
+    if (checked) {
+      newSelected.add(id);
+    } else {
+      newSelected.delete(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = new Set(filteredInbox.filter(i => i.status === 'new' && i.suggested_attribute_id).map(i => i.id));
+      setSelectedIds(allIds);
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const handleBatchLink = async () => {
+    if (selectedIds.size === 0) return;
+
+    if (!confirm(`Связать ${selectedIds.size} атрибутов с предложенными?`)) return;
+
+    setBatchProcessing(true);
+    const result = await batchLinkSuggested(Array.from(selectedIds));
+    setBatchProcessing(false);
+    setSelectedIds(new Set());
+
+    if (result) {
+      alert(`Успешно: ${result.success}, Ошибок: ${result.failed}`);
+      await loadInbox(supplierId, statusFilter);
+    }
+  };
+
+  const handleRefreshSuggestions = async () => {
+    if (!confirm('Обновить suggested matches для всех новых атрибутов?')) return;
+    await refreshSuggestions();
+    await loadInbox(supplierId, statusFilter);
   };
 
   const closeDialog = () => {
@@ -68,6 +126,8 @@ export function InboxTab({ supplierId }: InboxTabProps) {
     );
   }
 
+  const itemsWithSuggestions = filteredInbox.filter(i => i.status === 'new' && i.suggested_attribute_id).length;
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-6 border-b border-gray-200 bg-white">
@@ -81,7 +141,7 @@ export function InboxTab({ supplierId }: InboxTabProps) {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
           <Filter className="w-4 h-4 text-gray-500" />
           <select
             value={statusFilter}
@@ -94,10 +154,50 @@ export function InboxTab({ supplierId }: InboxTabProps) {
             <option value="created">Created (созданы)</option>
             <option value="ignored">Ignored (игнорированы)</option>
           </select>
+
+          <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+            <input
+              type="checkbox"
+              checked={showOnlyWithSuggestions}
+              onChange={(e) => setShowOnlyWithSuggestions(e.target.checked)}
+              className="rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700">С предложениями</span>
+          </label>
+
+          {statusFilter === 'new' && itemsWithSuggestions > 0 && (
+            <>
+              <div className="ml-auto flex items-center gap-2">
+                {selectedIds.size > 0 && (
+                  <>
+                    <span className="text-sm text-gray-600">
+                      Выбрано: {selectedIds.size}
+                    </span>
+                    <button
+                      onClick={handleBatchLink}
+                      disabled={batchProcessing}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                    >
+                      <Zap className="w-4 h-4" />
+                      {batchProcessing ? 'Обработка...' : 'Link всё выбранное'}
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={handleRefreshSuggestions}
+                  className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm"
+                  title="Обновить предложения"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="text-sm text-gray-600">
-          Найдено: {inbox.length} атрибутов
+          Найдено: {filteredInbox.length} атрибутов
+          {itemsWithSuggestions > 0 && ` (${itemsWithSuggestions} с предложениями)`}
         </div>
       </div>
 
@@ -106,20 +206,28 @@ export function InboxTab({ supplierId }: InboxTabProps) {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                {statusFilter === 'new' && (
+                  <th className="px-4 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      checked={selectedIds.size > 0 && selectedIds.size === itemsWithSuggestions}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                      title="Выбрать все с предложениями"
+                    />
+                  </th>
+                )}
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Raw Name
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Suggested Match
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Поставщик
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Категория
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Frequency
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Examples
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
@@ -130,27 +238,58 @@ export function InboxTab({ supplierId }: InboxTabProps) {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {inbox.map((item) => (
+              {filteredInbox.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                  {statusFilter === 'new' && (
+                    <td className="px-4 py-3">
+                      {item.suggested_attribute_id && (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(item.id)}
+                          onChange={(e) => handleSelectItem(item.id, e.target.checked)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                        />
+                      )}
+                    </td>
+                  )}
                   <td className="px-4 py-3">
                     <div className="text-sm font-medium text-gray-900">{item.raw_name}</div>
-                    {item.suggested_attribute && (
-                      <div className="text-xs text-blue-600 mt-1">
-                        Предложение: {item.suggested_attribute.name}
+                    {item.examples && item.examples.length > 0 && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        Примеры: {item.examples.slice(0, 2).join(', ')}
                       </div>
                     )}
                   </td>
+                  <td className="px-4 py-3">
+                    {item.suggested_attribute ? (
+                      <div>
+                        <div className="text-sm font-medium text-blue-700">
+                          {item.suggested_attribute.name}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <code className="text-xs bg-gray-100 px-1 py-0.5 rounded text-gray-600">
+                            {item.suggested_attribute.key}
+                          </code>
+                          {item.suggested_confidence && (
+                            <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                              item.suggested_confidence >= 0.9 ? 'bg-green-100 text-green-700' :
+                              item.suggested_confidence >= 0.7 ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-orange-100 text-orange-700'
+                            }`}>
+                              {(item.suggested_confidence * 100).toFixed(0)}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400">Нет предложения</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-sm text-gray-600">{item.supplier_name || '-'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{item.category_name || '-'}</td>
                   <td className="px-4 py-3">
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
                       {item.frequency}
                     </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {item.examples && item.examples.length > 0
-                      ? item.examples.slice(0, 2).join(', ')
-                      : '-'}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
@@ -165,6 +304,16 @@ export function InboxTab({ supplierId }: InboxTabProps) {
                   <td className="px-4 py-3">
                     {item.status === 'new' ? (
                       <div className="flex items-center gap-2">
+                        {item.suggested_attribute_id && (
+                          <button
+                            onClick={() => handleLinkSuggested(item)}
+                            className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs font-medium"
+                            title="Быстро связать с предложенным"
+                          >
+                            <Zap className="w-3 h-3" />
+                            Quick Link
+                          </button>
+                        )}
                         <button
                           onClick={() => handleLink(item)}
                           className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
@@ -175,7 +324,7 @@ export function InboxTab({ supplierId }: InboxTabProps) {
                         </button>
                         <button
                           onClick={() => handleCreate(item)}
-                          className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs"
+                          className="flex items-center gap-1 px-2 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 text-xs"
                           title="Создать новый глобальный атрибут"
                         >
                           <Plus className="w-3 h-3" />
@@ -187,7 +336,6 @@ export function InboxTab({ supplierId }: InboxTabProps) {
                           title="Игнорировать"
                         >
                           <XCircle className="w-3 h-3" />
-                          Ignore
                         </button>
                       </div>
                     ) : (
@@ -199,12 +347,14 @@ export function InboxTab({ supplierId }: InboxTabProps) {
             </tbody>
           </table>
 
-          {inbox.length === 0 && (
+          {filteredInbox.length === 0 && (
             <div className="text-center py-12 text-gray-500">
               <Inbox className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p>
                 {statusFilter === 'new'
-                  ? 'Все новые атрибуты обработаны'
+                  ? showOnlyWithSuggestions
+                    ? 'Нет атрибутов с предложениями'
+                    : 'Все новые атрибуты обработаны'
                   : 'Атрибуты не найдены'}
               </p>
             </div>
@@ -309,9 +459,6 @@ function LinkAttributeDialog({
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="font-medium text-gray-900">{attr.name}</div>
-                    {attr.name_uk && (
-                      <div className="text-sm text-gray-500 mt-0.5">{attr.name_uk}</div>
-                    )}
                     <div className="flex items-center gap-2 mt-2">
                       <code className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-700">
                         {attr.key}
@@ -329,7 +476,7 @@ function LinkAttributeDialog({
                     </div>
                     {attr.aliases && attr.aliases.length > 0 && (
                       <div className="text-xs text-gray-500 mt-2">
-                        Aliases: {attr.aliases.slice(0, 3).join(', ')}
+                        Aliases: {attr.aliases.slice(0, 3).map((a: any) => a.text).join(', ')}
                       </div>
                     )}
                   </div>
