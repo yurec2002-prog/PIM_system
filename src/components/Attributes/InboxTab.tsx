@@ -63,7 +63,7 @@ export function InboxTab({ supplierId }: InboxTabProps) {
   };
 
   const handleIgnore = async (item: InboxItem) => {
-    if (confirm(`Игнорировать атрибут "${item.raw_name}"?`)) {
+    if (confirm(`Ігнорувати атрибут "${item.raw_name}"?`)) {
       await ignoreInboxItem(item.id);
       await loadInbox(supplierId, statusFilter);
     }
@@ -91,7 +91,7 @@ export function InboxTab({ supplierId }: InboxTabProps) {
   const handleBatchLink = async () => {
     if (selectedIds.size === 0) return;
 
-    if (!confirm(`Связать ${selectedIds.size} атрибутов с предложенными?`)) return;
+    if (!confirm(`Зв'язати ${selectedIds.size} атрибутів з пропонованими?`)) return;
 
     setBatchProcessing(true);
     const result = await batchLinkSuggested(Array.from(selectedIds));
@@ -99,13 +99,13 @@ export function InboxTab({ supplierId }: InboxTabProps) {
     setSelectedIds(new Set());
 
     if (result) {
-      alert(`Успешно: ${result.success}, Ошибок: ${result.failed}`);
+      alert(`Успішно: ${result.success}, Помилок: ${result.failed}`);
       await loadInbox(supplierId, statusFilter);
     }
   };
 
   const handleRefreshSuggestions = async () => {
-    if (!confirm('Обновить suggested matches для всех новых атрибутов?')) return;
+    if (!confirm('Оновити пропозиції для всіх нових атрибутів?')) return;
     await refreshSuggestions();
     await loadInbox(supplierId, statusFilter);
   };
@@ -120,7 +120,7 @@ export function InboxTab({ supplierId }: InboxTabProps) {
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <Loader className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-2" />
-          <p className="text-gray-600">Загрузка неопознанных атрибутов...</p>
+          <p className="text-gray-600">Завантаження нерозпізнаних атрибутів...</p>
         </div>
       </div>
     );
@@ -134,10 +134,10 @@ export function InboxTab({ supplierId }: InboxTabProps) {
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
             <Inbox className="w-6 h-6 text-orange-600" />
-            <h2 className="text-xl font-bold text-gray-900">Inbox: Неопознанные атрибуты</h2>
+            <h2 className="text-xl font-bold text-gray-900">Inbox: Нерозпізнані атрибути</h2>
           </div>
           <p className="text-sm text-gray-600">
-            Атрибуты из импорта, которые нужно связать (Link) или создать (Create) в глобальном справочнике
+            Атрибути з імпорту, які потрібно зв'язати (Link) або створити (Create) у глобальному довіднику
           </p>
         </div>
 
@@ -148,11 +148,11 @@ export function InboxTab({ supplierId }: InboxTabProps) {
             onChange={(e) => setStatusFilter(e.target.value as InboxStatus | 'all')}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
           >
-            <option value="all">Все статусы</option>
-            <option value="new">New (новые)</option>
-            <option value="linked">Linked (связаны)</option>
-            <option value="created">Created (созданы)</option>
-            <option value="ignored">Ignored (игнорированы)</option>
+            <option value="all">Всі статуси</option>
+            <option value="new">New (нові)</option>
+            <option value="linked">Linked (зв'язані)</option>
+            <option value="created">Created (створені)</option>
+            <option value="ignored">Ignored (ігноровані)</option>
           </select>
 
           <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
@@ -162,7 +162,7 @@ export function InboxTab({ supplierId }: InboxTabProps) {
               onChange={(e) => setShowOnlyWithSuggestions(e.target.checked)}
               className="rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
             />
-            <span className="text-sm text-gray-700">С предложениями</span>
+            <span className="text-sm text-gray-700">З пропозиціями</span>
           </label>
 
           {statusFilter === 'new' && itemsWithSuggestions > 0 && (
@@ -171,7 +171,7 @@ export function InboxTab({ supplierId }: InboxTabProps) {
                 {selectedIds.size > 0 && (
                   <>
                     <span className="text-sm text-gray-600">
-                      Выбрано: {selectedIds.size}
+                      Обрано: {selectedIds.size}
                     </span>
                     <button
                       onClick={handleBatchLink}
@@ -179,14 +179,14 @@ export function InboxTab({ supplierId }: InboxTabProps) {
                       className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
                     >
                       <Zap className="w-4 h-4" />
-                      {batchProcessing ? 'Обработка...' : 'Link всё выбранное'}
+                      {batchProcessing ? 'Обробка...' : 'Link всі обрані'}
                     </button>
                   </>
                 )}
                 <button
                   onClick={handleRefreshSuggestions}
                   className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm"
-                  title="Обновить предложения"
+                  title="Оновити пропозиції"
                 >
                   <RefreshCw className="w-4 h-4" />
                 </button>
@@ -196,8 +196,8 @@ export function InboxTab({ supplierId }: InboxTabProps) {
         </div>
 
         <div className="text-sm text-gray-600">
-          Найдено: {filteredInbox.length} атрибутов
-          {itemsWithSuggestions > 0 && ` (${itemsWithSuggestions} с предложениями)`}
+          Знайдено: {filteredInbox.length} атрибутів
+          {itemsWithSuggestions > 0 && ` (${itemsWithSuggestions} з пропозиціями)`}
         </div>
       </div>
 
@@ -213,7 +213,7 @@ export function InboxTab({ supplierId }: InboxTabProps) {
                       onChange={(e) => handleSelectAll(e.target.checked)}
                       checked={selectedIds.size > 0 && selectedIds.size === itemsWithSuggestions}
                       className="rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                      title="Выбрать все с предложениями"
+                      title="Обрати всі з пропозиціями"
                     />
                   </th>
                 )}
@@ -224,7 +224,7 @@ export function InboxTab({ supplierId }: InboxTabProps) {
                   Suggested Match
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Поставщик
+                  Постачальник
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Frequency
@@ -233,7 +233,7 @@ export function InboxTab({ supplierId }: InboxTabProps) {
                   Status
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Действия
+                  Дії
                 </th>
               </tr>
             </thead>
@@ -256,7 +256,7 @@ export function InboxTab({ supplierId }: InboxTabProps) {
                     <div className="text-sm font-medium text-gray-900">{item.raw_name}</div>
                     {item.examples && item.examples.length > 0 && (
                       <div className="text-xs text-gray-500 mt-1">
-                        Примеры: {item.examples.slice(0, 2).join(', ')}
+                        Приклади: {item.examples.slice(0, 2).join(', ')}
                       </div>
                     )}
                   </td>
@@ -282,7 +282,7 @@ export function InboxTab({ supplierId }: InboxTabProps) {
                         </div>
                       </div>
                     ) : (
-                      <span className="text-xs text-gray-400">Нет предложения</span>
+                      <span className="text-xs text-gray-400">Немає пропозиції</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">{item.supplier_name || '-'}</td>
@@ -308,7 +308,7 @@ export function InboxTab({ supplierId }: InboxTabProps) {
                           <button
                             onClick={() => handleLinkSuggested(item)}
                             className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs font-medium"
-                            title="Быстро связать с предложенным"
+            title="Швидко зв'язати з пропонованим"
                           >
                             <Zap className="w-3 h-3" />
                             Quick Link
@@ -317,7 +317,7 @@ export function InboxTab({ supplierId }: InboxTabProps) {
                         <button
                           onClick={() => handleLink(item)}
                           className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
-                          title="Связать с существующим атрибутом"
+                          title="Зв'язати з існуючим атрибутом"
                         >
                           <Link2 className="w-3 h-3" />
                           Link
@@ -325,7 +325,7 @@ export function InboxTab({ supplierId }: InboxTabProps) {
                         <button
                           onClick={() => handleCreate(item)}
                           className="flex items-center gap-1 px-2 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 text-xs"
-                          title="Создать новый глобальный атрибут"
+                          title="Створити новий глобальний атрибут"
                         >
                           <Plus className="w-3 h-3" />
                           Create
@@ -333,13 +333,13 @@ export function InboxTab({ supplierId }: InboxTabProps) {
                         <button
                           onClick={() => handleIgnore(item)}
                           className="flex items-center gap-1 px-2 py-1 bg-gray-400 text-white rounded hover:bg-gray-500 text-xs"
-                          title="Игнорировать"
+                          title="Ігнорувати"
                         >
                           <XCircle className="w-3 h-3" />
                         </button>
                       </div>
                     ) : (
-                      <span className="text-xs text-gray-500">Обработан</span>
+                      <span className="text-xs text-gray-500">Оброблений</span>
                     )}
                   </td>
                 </tr>
@@ -353,9 +353,9 @@ export function InboxTab({ supplierId }: InboxTabProps) {
               <p>
                 {statusFilter === 'new'
                   ? showOnlyWithSuggestions
-                    ? 'Нет атрибутов с предложениями'
-                    : 'Все новые атрибуты обработаны'
-                  : 'Атрибуты не найдены'}
+                    ? 'Немає атрибутів з пропозиціями'
+                    : 'Всі нові атрибути оброблені'
+                  : 'Атрибути не знайдено'}
               </p>
             </div>
           )}
@@ -419,7 +419,7 @@ function LinkAttributeDialog({
       <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-auto">
         <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
           <div>
-            <h3 className="text-xl font-bold text-gray-900">Link: Связать с существующим атрибутом</h3>
+            <h3 className="text-xl font-bold text-gray-900">Link: Зв'язати з існуючим атрибутом</h3>
             <p className="text-sm text-gray-600 mt-1">
               Raw name: <span className="font-medium text-orange-700">{item.raw_name}</span>
             </p>
@@ -439,7 +439,7 @@ function LinkAttributeDialog({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Поиск в глобальном справочнике..."
+              placeholder="Пошук у глобальному довіднику..."
               className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
               autoFocus
             />
@@ -458,7 +458,7 @@ function LinkAttributeDialog({
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="font-medium text-gray-900">{attr.name}</div>
+                    <div className="font-medium text-gray-900">{attr.name_uk || attr.name}</div>
                     <div className="flex items-center gap-2 mt-2">
                       <code className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-700">
                         {attr.key}
@@ -476,7 +476,7 @@ function LinkAttributeDialog({
                     </div>
                     {attr.aliases && attr.aliases.length > 0 && (
                       <div className="text-xs text-gray-500 mt-2">
-                        Aliases: {attr.aliases.slice(0, 3).map((a: any) => a.text).join(', ')}
+                        Синоніми: {attr.aliases.slice(0, 3).map((a: any) => a.text).join(', ')}
                       </div>
                     )}
                   </div>
@@ -488,7 +488,7 @@ function LinkAttributeDialog({
             ))}
             {results.length === 0 && (
               <div className="text-center py-8 text-gray-500">
-                Атрибуты не найдены
+                Атрибути не знайдено
               </div>
             )}
           </div>
@@ -502,7 +502,7 @@ function LinkAttributeDialog({
                 className="rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
               />
               <span className="text-sm text-gray-700">
-                Создать alias (добавить "{item.raw_name}" как синоним выбранного атрибута)
+                Створити синонім (додати "{item.raw_name}" як синонім обраного атрибута)
               </span>
             </label>
           </div>
@@ -513,13 +513,13 @@ function LinkAttributeDialog({
               disabled={!selectedAttrId}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Связать атрибут
+              Зв'язати атрибут
             </button>
             <button
               onClick={onClose}
               className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
             >
-              Отмена
+              Скасувати
             </button>
           </div>
         </div>
@@ -541,21 +541,21 @@ interface CreateAttributeDialogProps {
 }
 
 function CreateAttributeDialog({ item, onCreate, onClose }: CreateAttributeDialogProps) {
-  const [name, setName] = useState(item.raw_name);
-  const [nameUk, setNameUk] = useState('');
+  const [nameUk, setNameUk] = useState(item.raw_name);
+  const [name, setName] = useState('');
   const [type, setType] = useState('text');
   const [unitKind, setUnitKind] = useState('');
   const [defaultUnit, setDefaultUnit] = useState('');
 
   const handleCreate = () => {
-    if (!name) {
-      alert('Название обязательно');
+    if (!nameUk) {
+      alert('Назва (Українська) обов\'язкова');
       return;
     }
 
     onCreate({
-      name,
-      name_uk: nameUk || undefined,
+      name: name || undefined,
+      name_uk: nameUk,
       type,
       unit_kind: unitKind || undefined,
       default_unit: defaultUnit || undefined,
@@ -567,7 +567,7 @@ function CreateAttributeDialog({ item, onCreate, onClose }: CreateAttributeDialo
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-auto">
         <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
           <div>
-            <h3 className="text-xl font-bold text-gray-900">Create: Создать новый глобальный атрибут</h3>
+            <h3 className="text-xl font-bold text-gray-900">Create: Створити новий глобальний атрибут</h3>
             <p className="text-sm text-gray-600 mt-1">
               Из raw: <span className="font-medium text-orange-700">{item.raw_name}</span>
             </p>
@@ -583,18 +583,18 @@ function CreateAttributeDialog({ item, onCreate, onClose }: CreateAttributeDialo
         <div className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Название (Русский) <span className="text-red-500">*</span>
+              Назва (Українська) <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={nameUk}
+              onChange={(e) => setNameUk(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Название (Украинский)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Назва (Російська)</label>
             <input
               type="text"
               value={nameUk}
@@ -619,7 +619,7 @@ function CreateAttributeDialog({ item, onCreate, onClose }: CreateAttributeDialo
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Unit Kind (необязательно)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Unit Kind (необов'язково)</label>
               <input
                 type="text"
                 value={unitKind}
@@ -631,7 +631,7 @@ function CreateAttributeDialog({ item, onCreate, onClose }: CreateAttributeDialo
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Default Unit (необязательно)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Default Unit (необов'язково)</label>
             <input
               type="text"
               value={defaultUnit}
@@ -645,13 +645,13 @@ function CreateAttributeDialog({ item, onCreate, onClose }: CreateAttributeDialo
             <div className="flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-green-800">
-                <div className="font-medium mb-1">Что будет создано:</div>
+                <div className="font-medium mb-1">Що буде створено:</div>
                 <ul className="list-disc list-inside space-y-1 text-xs">
-                  <li>Новый атрибут в глобальном справочнике (master_attributes)</li>
-                  <li>Key будет сгенерирован автоматически: supplier:{'{supplier_id}'}:{'{normalized_name}'}</li>
+                  <li>Новий атрибут у глобальному довіднику (master_attributes)</li>
+                  <li>Key буде згенеровано автоматично: supplier:{'{supplier_id}'}:{'{normalized_name}'}</li>
                   <li>Source = supplier, needs_review = true</li>
-                  <li>Alias "{item.raw_name}" будет добавлен автоматически</li>
-                  <li>Inbox item будет помечен как "created" и связан с новым атрибутом</li>
+                  <li>Синонім "{item.raw_name}" буде додано автоматично</li>
+                  <li>Inbox item буде позначено як "created" і зв'язано з новим атрибутом</li>
                 </ul>
               </div>
             </div>
@@ -662,13 +662,13 @@ function CreateAttributeDialog({ item, onCreate, onClose }: CreateAttributeDialo
               onClick={handleCreate}
               className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
             >
-              Создать глобальный атрибут
+              Створити глобальний атрибут
             </button>
             <button
               onClick={onClose}
               className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
             >
-              Отмена
+              Скасувати
             </button>
           </div>
         </div>

@@ -48,7 +48,7 @@ export function DictionaryTab({ initialSearch = '' }: DictionaryTabProps) {
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <Loader className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-2" />
-          <p className="text-gray-600">Загрузка глобального справочника...</p>
+          <p className="text-gray-600">Завантаження глобального довідника...</p>
         </div>
       </div>
     );
@@ -58,9 +58,9 @@ export function DictionaryTab({ initialSearch = '' }: DictionaryTabProps) {
     <div className="flex flex-col h-full">
       <div className="p-6 border-b border-gray-200 bg-white">
         <div className="mb-4">
-          <h2 className="text-xl font-bold text-gray-900">Глобальный справочник атрибутов</h2>
+          <h2 className="text-xl font-bold text-gray-900">Глобальний довідник атрибутів</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Единый мастер-список всех атрибутов без дублей
+            Єдиний майстер-список всіх атрибутів без дублів
           </p>
         </div>
 
@@ -71,7 +71,7 @@ export function DictionaryTab({ initialSearch = '' }: DictionaryTabProps) {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Поиск по названию, key, code..."
+              placeholder="Пошук за назвою, key, code..."
               className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -81,7 +81,7 @@ export function DictionaryTab({ initialSearch = '' }: DictionaryTabProps) {
             onChange={(e) => setTypeFilter(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
           >
-            <option value="all">Все типы</option>
+            <option value="all">Всі типи</option>
             <option value="text">Text</option>
             <option value="string">String</option>
             <option value="number">Number</option>
@@ -94,7 +94,7 @@ export function DictionaryTab({ initialSearch = '' }: DictionaryTabProps) {
             onChange={(e) => setSourceFilter(e.target.value as AttributeSource | 'all')}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
           >
-            <option value="all">Все источники</option>
+            <option value="all">Всі джерела</option>
             <option value="sandi">Sandi</option>
             <option value="manual">Manual</option>
             <option value="supplier">Supplier</option>
@@ -122,7 +122,7 @@ export function DictionaryTab({ initialSearch = '' }: DictionaryTabProps) {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Название (RU)
+                  Назва (UK)
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Key
@@ -157,7 +157,10 @@ export function DictionaryTab({ initialSearch = '' }: DictionaryTabProps) {
                   className="hover:bg-gray-50 cursor-pointer transition-colors"
                 >
                   <td className="px-4 py-3">
-                    <div className="text-sm font-medium text-gray-900">{attr.name}</div>
+                    <div className="text-sm font-medium text-gray-900">{attr.name_uk || attr.name}</div>
+                    {attr.name_uk && attr.name && attr.name !== attr.name_uk && (
+                      <div className="text-xs text-gray-500 mt-0.5">RU: {attr.name}</div>
+                    )}
                     {attr.name_uk && (
                       <div className="text-xs text-gray-500">{attr.name_uk}</div>
                     )}
@@ -265,8 +268,8 @@ function AttributeDetailsModal({ attribute, onClose, onUpdate }: AttributeDetail
 
   const handleSave = () => {
     onUpdate({
-      name: editedName,
-      name_uk: editedNameUk || undefined,
+      name: editedName || undefined,
+      name_uk: editedNameUk,
       name_en: editedNameEn || undefined,
       unit_kind: editedUnitKind || undefined,
       default_unit: editedDefaultUnit || undefined,
@@ -282,19 +285,19 @@ function AttributeDetailsModal({ attribute, onClose, onUpdate }: AttributeDetail
       await addAlias(attribute.id, newAlias.trim());
       setNewAlias('');
     } catch (error) {
-      alert('Ошибка добавления alias. Возможно, такой alias уже существует.');
+      alert('Помилка додавання синоніму. Можливо, такий синонім вже існує.');
     } finally {
       setAddingAlias(false);
     }
   };
 
   const handleRemoveAlias = async (aliasId: string) => {
-    if (!confirm('Удалить этот alias?')) return;
+    if (!confirm('Видалити цей синонім?')) return;
 
     try {
       await removeAlias(aliasId);
     } catch (error) {
-      alert('Ошибка удаления alias');
+      alert('Помилка видалення синоніму');
     }
   };
 
@@ -352,7 +355,7 @@ function AttributeDetailsModal({ attribute, onClose, onUpdate }: AttributeDetail
             <label className="block text-sm font-medium text-gray-700 mb-2">Названия</label>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Русский</label>
+                <label className="block text-xs text-gray-500 mb-1">Російська</label>
                 <input
                   type="text"
                   value={editedName}
@@ -405,7 +408,7 @@ function AttributeDetailsModal({ attribute, onClose, onUpdate }: AttributeDetail
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Aliases (синонимы)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Синоніми (Aliases)</label>
 
             <div className="mb-3 flex gap-2">
               <input
@@ -413,7 +416,7 @@ function AttributeDetailsModal({ attribute, onClose, onUpdate }: AttributeDetail
                 value={newAlias}
                 onChange={(e) => setNewAlias(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleAddAlias()}
-                placeholder="Добавить алиас..."
+                placeholder="Додати синонім..."
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                 disabled={addingAlias}
               />
@@ -423,7 +426,7 @@ function AttributeDetailsModal({ attribute, onClose, onUpdate }: AttributeDetail
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
-                Добавить
+                Додати
               </button>
             </div>
 
@@ -437,7 +440,7 @@ function AttributeDetailsModal({ attribute, onClose, onUpdate }: AttributeDetail
                       <button
                         onClick={() => handleRemoveAlias(alias.id)}
                         className="ml-1 text-blue-600 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Удалить alias"
+                        title="Видалити синонім"
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -447,7 +450,7 @@ function AttributeDetailsModal({ attribute, onClose, onUpdate }: AttributeDetail
               </div>
             ) : (
               <div className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-500 text-center">
-                Нет aliases
+                Немає синонімів
               </div>
             )}
           </div>
@@ -478,13 +481,13 @@ function AttributeDetailsModal({ attribute, onClose, onUpdate }: AttributeDetail
               onClick={handleSave}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
             >
-              Сохранить изменения
+              Зберегти зміни
             </button>
             <button
               onClick={onClose}
               className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
             >
-              Отмена
+              Скасувати
             </button>
           </div>
         </div>
