@@ -345,9 +345,10 @@ async function processBatch(
       for (const [attrRef, attrValue] of Object.entries(product.attributes)) {
         const attrName = attributeNames[attrRef];
         if (attrName) {
-          const key = attrName.ru || attrName.uk || attrRef;
-          attributesRu[key] = attrValue.ru || '';
-          attributesUk[key] = attrValue.uk || '';
+          const keyRu = attrName.ru || attrName.uk || attrRef;
+          const keyUk = attrName.uk || attrName.ru || attrRef;
+          attributesRu[keyRu] = attrValue.ru || attrValue.uk || '';
+          attributesUk[keyUk] = attrValue.uk || attrValue.ru || '';
         }
       }
     }
@@ -557,9 +558,10 @@ async function processProduct(
     for (const [attrRef, attrValue] of Object.entries(product.attributes)) {
       const attrName = attributeNames[attrRef];
       if (attrName) {
-        const key = attrName.ru || attrName.uk || attrRef;
-        attributesRu[key] = attrValue.ru || '';
-        attributesUk[key] = attrValue.uk || '';
+        const keyRu = attrName.ru || attrName.uk || attrRef;
+        const keyUk = attrName.uk || attrName.ru || attrRef;
+        attributesRu[keyRu] = attrValue.ru || attrValue.uk || '';
+        attributesUk[keyUk] = attrValue.uk || attrValue.ru || '';
       }
     }
   }

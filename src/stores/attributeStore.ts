@@ -104,27 +104,25 @@ export const useAttributeStore = create<AttributeStoreState>((set, get) => ({
       return;
     }
 
-    const dictionaryWithStats = await Promise.all(
-      (attributes || []).map(async (attr) => {
-        const { count: usageCount } = await supabase
-          .from('category_attributes')
-          .select('*', { count: 'exact', head: true })
-          .eq('attribute_id', attr.id);
+    // Load with JOINs using optimized RPC function
+    const { data: dictionaryWithStats, error: rpcError } = await supabase
+      .rpc('get_master_attributes_with_stats');
 
-        const { data: aliases } = await supabase
-          .from('attribute_aliases')
-          .select('id, alias_text')
-          .eq('attribute_id', attr.id);
-
-        return {
+    if (rpcError) {
+      console.error('Error loading dictionary with stats:', rpcError);
+      // Fallback to basic load without stats
+      set({
+        dictionary: (attributes || []).map(attr => ({
           ...attr,
-          usage_count: usageCount || 0,
-          aliases: aliases?.map(a => ({ id: a.id, text: a.alias_text })) || [],
-        };
-      })
-    );
+          usage_count: 0,
+          aliases: [],
+        })),
+        loading: false
+      });
+      return;
+    }
 
-    set({ dictionary: dictionaryWithStats, loading: false });
+    set({ dictionary: dictionaryWithStats || [], loading: false });
   },
 
   loadInbox: async (supplierId?: string, status: InboxStatus | 'all' = 'new') => {
@@ -223,7 +221,7 @@ export const useAttributeStore = create<AttributeStoreState>((set, get) => ({
   createDictionaryAttribute: async (attribute) => {
     const key = await supabase.rpc('generate_attribute_key', {
       p_source: attribute.source,
-      p_name: attribute.name,
+      p_name: attribute.name_uk || attribute.name,
       p_supplier_id: attribute.supplier_id || null,
     });
 
@@ -236,7 +234,7 @@ export const useAttributeStore = create<AttributeStoreState>((set, get) => ({
       .from('master_attributes')
       .insert({
         key: key.data,
-        code: attribute.name.toUpperCase().replace(/[^A-ZА-ЯЁ0-9]+/g, '_'),
+        code: (attribute.name_uk || attribute.name).toUpperCase().replace(/[^A-ZА-ЯЁ0-9]+/g, '_'),
         name: attribute.name,
         name_uk: attribute.name_uk,
         name_en: attribute.name_en,
